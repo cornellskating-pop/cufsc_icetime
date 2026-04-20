@@ -62,8 +62,8 @@ Session: ${sessionId}
 Review and approve or deny at: ${APP_URL}/admin/approvals`;
     }
 
-    const emailPromises = admins.map((admin) =>
-      fetch("https://api.resend.com/emails", {
+    const emailPromises = admins.map(async (admin) => {
+      const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${RESEND_API_KEY}`,
@@ -75,8 +75,10 @@ Review and approve or deny at: ${APP_URL}/admin/approvals`;
           subject,
           text: body,
         }),
-      })
-    );
+      });
+      const data = await res.json();
+      console.log(`Resend → ${admin.email}: ${res.status}`, JSON.stringify(data));
+    });
 
     await Promise.all(emailPromises);
 
