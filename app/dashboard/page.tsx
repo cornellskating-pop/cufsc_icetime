@@ -500,7 +500,7 @@ export default function Dashboard() {
             <span style={{ color: RED }}>Ice Time</span>
           </div>
           <div style={{ fontSize: 13, color: "#999", fontWeight: 300, marginBottom: 28, maxWidth: 420 }}>
-            Select up to 2 sessions. Credits deducted at booking — refunded if cancelled ≥ 30 min before start.
+            Select up to 2 sessions. Credits deducted at booking and refunded if cancelled ≥ 30 min before start.
           </div>
           <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
             {[
