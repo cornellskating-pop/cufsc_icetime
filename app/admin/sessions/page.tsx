@@ -23,6 +23,7 @@ export default function AdminSessions() {
   const [msg, setMsg] = useState("");
   const [msgType, setMsgType] = useState<"success"|"error"|"info">("info");
   const [showForm, setShowForm] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
 
   const load = async () => {
     const { data, error } = await supabase.rpc("admin_list_sessions");
@@ -87,7 +88,7 @@ export default function AdminSessions() {
   const f = (k: keyof typeof EMPTY_FORM) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(prev => ({ ...prev, [k]: e.target.value }));
 
-  return (
+  return (<>
     <div>
       <AdminTopBar active="sessions" />
 
@@ -184,7 +185,10 @@ export default function AdminSessions() {
                         </div>
                       </td>
                       <td>
-                        <button className="btn-link" onClick={() => edit(r)}>Edit</button>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button className="btn-link" onClick={() => edit(r)}>Edit</button>
+                          <button className="btn-link" style={{ color: "var(--red)" }} onClick={() => setDeleteTarget(r)}>Delete</button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -195,5 +199,26 @@ export default function AdminSessions() {
         </div>
       </div>
     </div>
-  );
+
+    {deleteTarget && (
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100,
+        display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div className="card" style={{ padding: 28, maxWidth: 400, width: "90%", textAlign: "center" }}>
+          <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 18, marginBottom: 8 }}>Delete Session?</div>
+          <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 20 }}>
+            This will permanently delete <strong>{deleteTarget.id}</strong> and all its bookings. This cannot be undone.
+          </div>
+          <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+            <button className="btn-danger" onClick={async () => {
+              const { error } = await supabase.rpc("admin_delete_session", { p_id: deleteTarget.id });
+              if (error) { setMsg(error.message); setMsgType("error"); }
+              else { setMsg(`Session ${deleteTarget.id} deleted.`); setMsgType("success"); load(); }
+              setDeleteTarget(null);
+            }}>Yes, Delete</button>
+            <button className="btn-ghost" onClick={() => setDeleteTarget(null)}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    )}
+  </>);
 }
