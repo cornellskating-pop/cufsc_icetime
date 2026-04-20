@@ -217,6 +217,22 @@ export default function Dashboard() {
     });
   }, []);
 
+  const [accessStatus, setAccessStatus] = useState<"idle"|"pending"|"requested"|"error">("idle");
+
+  const requestAccess = async () => {
+    const { data, error } = await supabase.rpc("request_user_access");
+    if (error) { setAccessStatus("error"); return; }
+    setAccessStatus(data === "PENDING" ? "pending" : "requested");
+  };
+
+  useEffect(() => {
+    if (!loading && !profile) {
+      supabase.rpc("request_user_access").then(({ data }) => {
+        if (data === "PENDING") setAccessStatus("pending");
+      });
+    }
+  }, [loading, profile]);
+
   const credits = profile?.credits_balance ?? 0;
   const maxSelect = Math.min(2, Math.max(0, credits));
 
@@ -311,6 +327,45 @@ export default function Dashboard() {
   };
 
   if (loading) return <Loading />;
+
+  if (!profile) return (
+    <div style={{ minHeight: "100vh", background: CREAM, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ maxWidth: 400, width: "90%", textAlign: "center" }}>
+        <div style={{ width: 48, height: 48, background: RED, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" />
+          </svg>
+        </div>
+        <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 22, marginBottom: 8 }}>Not yet a member</div>
+        <div style={{ fontSize: 13, color: MUTED, marginBottom: 24 }}>
+          Your account isn't in the system yet. Request access and an admin will approve you.
+        </div>
+        {accessStatus === "requested" && (
+          <div style={{ background: SUCCESS_BG, color: SUCCESS, borderRadius: 8, padding: "10px 16px", fontSize: 13, marginBottom: 16 }}>
+            Request submitted — you'll be added once an admin approves it.
+          </div>
+        )}
+        {accessStatus === "pending" && (
+          <div style={{ background: "var(--warn-bg, #fefce8)", color: "#854D0E", borderRadius: 8, padding: "10px 16px", fontSize: 13, marginBottom: 16 }}>
+            Your request is already pending — an admin will review it soon.
+          </div>
+        )}
+        {accessStatus === "error" && (
+          <div style={{ background: RED_LIGHT, color: RED, borderRadius: 8, padding: "10px 16px", fontSize: 13, marginBottom: 16 }}>
+            Something went wrong. Please try again.
+          </div>
+        )}
+        {accessStatus === "idle" && (
+          <button className="btn-primary" style={{ width: "100%" }} onClick={requestAccess}>
+            Request Access
+          </button>
+        )}
+        <button className="btn-ghost" style={{ marginTop: 10, width: "100%", fontSize: 12 }} onClick={logout}>
+          Sign out
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{ background: CREAM, minHeight: "100vh" }}>
