@@ -62,25 +62,23 @@ Session: ${sessionId}
 Review and approve or deny at: ${APP_URL}/admin/approvals`;
     }
 
-    const emailPromises = admins.map(async (admin) => {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${RESEND_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: FROM_EMAIL,
-          to: admin.email,
-          subject,
-          text: body,
-        }),
-      });
-      const data = await res.json();
-      console.log(`Resend → ${admin.email}: ${res.status}`, JSON.stringify(data));
-    });
+    const NOTIFY_EMAIL = Deno.env.get("NOTIFY_EMAIL") ?? "cornellskating@gmail.com";
 
-    await Promise.all(emailPromises);
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${RESEND_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: FROM_EMAIL,
+        to: NOTIFY_EMAIL,
+        subject,
+        text: body,
+      }),
+    });
+    const data = await res.json();
+    console.log(`Resend → ${NOTIFY_EMAIL}: ${res.status}`, JSON.stringify(data));
 
     return new Response("OK", { status: 200 });
   } catch (err) {
