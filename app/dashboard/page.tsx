@@ -218,10 +218,11 @@ export default function Dashboard() {
   }, []);
 
   const [accessStatus, setAccessStatus] = useState<"idle"|"pending"|"requested"|"error">("idle");
+  const [accessError, setAccessError] = useState("");
 
   const requestAccess = async () => {
     const { data, error } = await supabase.rpc("request_user_access");
-    if (error) { setAccessStatus("error"); return; }
+    if (error) { setAccessError(error.message); setAccessStatus("error"); return; }
     setAccessStatus(data === "PENDING" ? "pending" : "requested");
   };
 
@@ -352,7 +353,7 @@ export default function Dashboard() {
         )}
         {accessStatus === "error" && (
           <div style={{ background: RED_LIGHT, color: RED, borderRadius: 8, padding: "10px 16px", fontSize: 13, marginBottom: 16 }}>
-            Something went wrong. Please try again.
+            {accessError || "Something went wrong. Please try again."}
           </div>
         )}
         {accessStatus === "idle" && (
