@@ -43,22 +43,12 @@ export default function AdminBookings() {
     });
 
     const now = new Date();
-    const endOfWeek = new Date(now);
-    const daysUntilSunday = now.getDay() === 0 ? 0 : 7 - now.getDay();
-    endOfWeek.setDate(now.getDate() + daysUntilSunday);
-    endOfWeek.setHours(23, 59, 59, 999);
-
     const allSessions = (sessionData || []) as any[];
 
-    const past8 = allSessions
-      .filter(s => new Date(s.end_time) < now)
-      .slice(-8)
-      .reverse();
+    const upcoming = allSessions.filter(s => new Date(s.start_time) >= now);
+    const past8 = allSessions.filter(s => new Date(s.end_time) < now).slice(-8).reverse();
 
-    const thisWeek = allSessions
-      .filter(s => new Date(s.start_time) >= now && new Date(s.start_time) <= endOfWeek);
-
-    const combined: SessionGroup[] = [...thisWeek, ...past8].map(s => ({
+    const combined: SessionGroup[] = [...upcoming, ...past8].map(s => ({
       session_id: s.id,
       start_time: s.start_time,
       end_time: s.end_time,
@@ -68,7 +58,7 @@ export default function AdminBookings() {
     }));
 
     setGroups(combined);
-    setExpanded(new Set(thisWeek.map((s: any) => s.id)));
+    setExpanded(new Set(upcoming.map((s: any) => s.id)));
   };
 
   useEffect(() => { load(); }, []);

@@ -69,7 +69,7 @@ This is the workflow you'll use every time you want to update the site.
 
 **2. Test it locally** by checking `http://localhost:3000` in your browser.
 
-**3. Open a terminal in the project folder and run:**
+**3. To make update to live site: Open a terminal in the project folder and run:**
 ```bash
 git add .
 git commit -m "Brief description of what you changed"
