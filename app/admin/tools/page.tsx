@@ -9,7 +9,9 @@ export default function AdminTools() {
   const [msgType, setMsgType] = useState<"success"|"error"|"info">("info");
   const [loading, setLoading] = useState<string | null>(null);
 
-  const run = async (label: string, fn: () => Promise<any>) => {
+  type ToolResult = { data: unknown; error: { message: string } | null };
+
+  const run = async (label: string, fn: () => PromiseLike<ToolResult>) => {
     if (!confirm(`Run "${label}"?`)) return;
     setLoading(label);
     setMsg("");
@@ -20,12 +22,11 @@ export default function AdminTools() {
     setMsgType("success");
   };
 
-  const tools: { key: string; title: string; description: string; danger: boolean; action: () => Promise<any> }[] = [
+  const tools: { key: string; title: string; description: string; action: () => PromiseLike<ToolResult> }[] = [
     {
       key: "reset",
       title: "Weekly Credit Reset",
       description: "Sets every user's credits_balance to their tier's weekly_credits value. Runs automatically each week — use this to trigger manually if needed.",
-      danger: false,
       action: async () => {
         const result = await supabase.rpc("admin_weekly_reset_credits");
         return result;

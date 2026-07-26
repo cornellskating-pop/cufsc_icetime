@@ -30,7 +30,16 @@ export default function AdminApprovals() {
     setRows((data || []) as Row[]);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    void supabase.rpc("admin_list_approvals").then(({ data, error }) => {
+      if (error) {
+        setMsg(error.message);
+        setMsgType("error");
+        return;
+      }
+      setRows((data || []) as Row[]);
+    });
+  }, []);
 
   const actSession = async (id: string, action: "approve"|"deny") => {
     setMsg("");

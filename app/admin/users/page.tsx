@@ -25,7 +25,16 @@ export default function AdminUsers() {
     setRows((data || []) as Row[]);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    void supabase.rpc("admin_list_users").then(({ data, error }) => {
+      if (error) {
+        setMsg(error.message);
+        setMsgType("error");
+        return;
+      }
+      setRows((data || []) as Row[]);
+    });
+  }, []);
 
   const edit = (r: Row) => {
     setForm({ id: r.id, email: r.email, name: r.name || "", tier: r.tier || "basic",
@@ -52,8 +61,14 @@ export default function AdminUsers() {
     setDeleteTarget(null);
   };
 
-  const sf = (k: keyof typeof EMPTY) => (e: React.ChangeEvent<HTMLInputElement|HTMLSelectElement>) =>
-    setForm(prev => ({ ...prev, [k]: e.target.type === "checkbox" ? (e.target as HTMLInputElement).checked : e.target.value }));
+  const sf = (k: keyof typeof EMPTY) => (e: React.ChangeEvent<HTMLInputElement|HTMLSelectElement>) => {
+    const value = e.target.type === "checkbox"
+      ? (e.target as HTMLInputElement).checked
+      : e.target.type === "number"
+        ? Number(e.target.value)
+        : e.target.value;
+    setForm(prev => ({ ...prev, [k]: value }));
+  };
 
   const filtered = rows.filter(r => {
     const q = search.toLowerCase();

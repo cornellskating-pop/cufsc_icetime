@@ -30,6 +30,12 @@ type Profile = {
   is_admin: boolean;
 };
 
+type BookingResult = {
+  ok: boolean;
+  message: string;
+  session_id?: string;
+};
+
 const RED = "var(--red)";
 const BORDER = "var(--border)";
 const MUTED = "var(--muted)";
@@ -63,7 +69,7 @@ function formatETShort(d: string) {
 function canCancelBooking(startTime: string) {
   const now = new Date();
   const start = new Date(startTime);
-  return now.getTime() <= start.getTime() + 15 * 60 * 1000;
+  return now.getTime() <= start.getTime() + 30 * 60 * 1000;
 }
 
 type SessionStatus = "open" | "grace" | "soon" | "full" | "closed" | "ended";
@@ -282,7 +288,7 @@ export default function Dashboard() {
       return;
     }
 
-    const results: any[] = Array.isArray(data) ? data : [];
+    const results: BookingResult[] = Array.isArray(data) ? data as BookingResult[] : [];
     const allOk = results.every((r) => r.ok);
 
     setMsg(results.map((r) => `${r.ok ? "✓" : "✗"} ${r.message}`).join("  ·  "));
@@ -294,11 +300,8 @@ export default function Dashboard() {
   };
 
   const cancel = async (bookingId: string, startTime: string) => {
-
-    console.log('cancel bookingId:', bookingId);  
-    
     if (!canCancelBooking(startTime)) {
-      setMsg("This booking can no longer be cancelled because the session started more than 15 minutes ago.");
+      setMsg("This booking can no longer be cancelled because the session started more than 30 minutes ago.");
       setMsgType("error");
       return;
     }
@@ -339,11 +342,11 @@ export default function Dashboard() {
         </div>
         <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 22, marginBottom: 8 }}>Not yet a member</div>
         <div style={{ fontSize: 13, color: MUTED, marginBottom: 24 }}>
-          Your account isn't in the system yet. Request access and an admin will approve you.
+          Your account isn&apos;t in the system yet. Request access and an admin will approve you.
         </div>
         {accessStatus === "requested" && (
           <div style={{ background: SUCCESS_BG, color: SUCCESS, borderRadius: 8, padding: "10px 16px", fontSize: 13, marginBottom: 16 }}>
-            Request submitted — you'll be added once an admin approves it.
+            Request submitted — you&apos;ll be added once an admin approves it.
           </div>
         )}
         {accessStatus === "pending" && (

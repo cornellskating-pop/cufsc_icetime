@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../../lib/supabaseClient";
-import { AdminTopBar, Msg, SpotBar } from "../../../lib/ui";
+import { AdminTopBar, Msg } from "../../../lib/ui";
 
 type Row = {
   id: string;
@@ -31,7 +31,16 @@ export default function AdminSessions() {
     setRows(((data || []) as Row[]).reverse());
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    void supabase.rpc("admin_list_sessions").then(({ data, error }) => {
+      if (error) {
+        setMsg(error.message);
+        setMsgType("error");
+        return;
+      }
+      setRows(((data || []) as Row[]).reverse());
+    });
+  }, []);
 
   const edit = (r: Row) => {
     setForm({
@@ -65,18 +74,19 @@ export default function AdminSessions() {
     if (!form.id.trim()) { setMsg("Session ID is required."); setMsgType("error"); return; }
     if (!form.start_time) { setMsg("Start time is required."); setMsgType("error"); return; }
     if (!form.end_time) { setMsg("End time is required."); setMsgType("error"); return; }
-    const start = new Date(form.start_time);
-    const end = new Date(form.end_time);
-    const release = form.release_at ? new Date(form.release_at) : null;
-    if (end <= start) { setMsg("End time must be after start time."); setMsgType("error"); return; }
-    if (release && release >= start) { setMsg("Release time must be before the session starts."); setMsgType("error"); return; }
+    const start = toET(form.start_time);
+    const end = toET(form.end_time);
+    const release = form.release_at ? toET(form.release_at) : null;
+    if (!start || !end) { setMsg("Enter valid session times."); setMsgType("error"); return; }
+    if (new Date(end) <= new Date(start)) { setMsg("End time must be after start time."); setMsgType("error"); return; }
+    if (release && new Date(release) >= new Date(start)) { setMsg("Release time must be before the session starts."); setMsgType("error"); return; }
     if (Number(form.capacity) < 0) { setMsg("Capacity cannot be negative."); setMsgType("error"); return; }
     const { data, error } = await supabase.rpc("admin_upsert_session", {
       p_id: form.id.trim(),
       p_label: form.label || null,
-      p_start_time: toET(form.start_time),
-      p_end_time: toET(form.end_time),
-      p_release_at: form.release_at ? toET(form.release_at) : null,
+      p_start_time: start,
+      p_end_time: end,
+      p_release_at: release,
       p_capacity: Number(form.capacity),
     });
     if (error) { setMsg(error.message); setMsgType("error"); return; }

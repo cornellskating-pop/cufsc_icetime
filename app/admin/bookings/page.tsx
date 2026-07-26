@@ -23,48 +23,70 @@ type SessionGroup = {
   bookings: BookingEntry[];
 };
 
+type SessionRow = {
+  id: string;
+  start_time: string;
+  end_time: string;
+  label: string | null;
+  capacity: number;
+};
+
+type GroupedBookingRow = {
+  session_id: string;
+  bookings: BookingEntry[] | null;
+};
+
 export default function AdminBookings() {
   const [groups, setGroups] = useState<SessionGroup[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [msg, setMsg] = useState("");
   const [msgType, setMsgType] = useState<"success" | "error" | "info">("info");
 
-  const load = async () => {
-    const [{ data: sessionData, error: sErr }, { data: bookingData, error: bErr }] = await Promise.all([
+  useEffect(() => {
+    void Promise.all([
       supabase.rpc("admin_list_sessions"),
       supabase.rpc("admin_list_session_bookings_grouped"),
-    ]);
-    if (sErr) { setMsg(sErr.message); setMsgType("error"); return; }
-    if (bErr) { setMsg(bErr.message); setMsgType("error"); return; }
+    ]).then(([sessionsResult, bookingsResult]) => {
+      if (sessionsResult.error) {
+        setMsg(sessionsResult.error.message);
+        setMsgType("error");
+        return;
+      }
+      if (bookingsResult.error) {
+        setMsg(bookingsResult.error.message);
+        setMsgType("error");
+        return;
+      }
 
-    const bookingMap = new Map<string, BookingEntry[]>();
-    ((bookingData || []) as any[]).forEach(row => {
-      bookingMap.set(row.session_id, ((row.bookings || []) as BookingEntry[]).filter(b => b.status === "active"));
+      const bookingMap = new Map<string, BookingEntry[]>();
+      ((bookingsResult.data || []) as GroupedBookingRow[]).forEach(row => {
+        bookingMap.set(row.session_id, (row.bookings || []).filter(b => b.status === "active"));
+      });
+
+      const now = new Date();
+      const allSessions = (sessionsResult.data || []) as SessionRow[];
+      const upcoming = allSessions.filter(s => new Date(s.start_time) >= now);
+      const past8 = allSessions.filter(s => new Date(s.end_time) < now).slice(-8).reverse();
+
+      setGroups([...upcoming, ...past8].map(s => ({
+        session_id: s.id,
+        start_time: s.start_time,
+        end_time: s.end_time,
+        label: s.label,
+        capacity: s.capacity,
+        bookings: bookingMap.get(s.id) || [],
+      })));
+      setExpanded(new Set(upcoming.map(s => s.id)));
     });
-
-    const now = new Date();
-    const allSessions = (sessionData || []) as any[];
-
-    const upcoming = allSessions.filter(s => new Date(s.start_time) >= now);
-    const past8 = allSessions.filter(s => new Date(s.end_time) < now).slice(-8).reverse();
-
-    const combined: SessionGroup[] = [...upcoming, ...past8].map(s => ({
-      session_id: s.id,
-      start_time: s.start_time,
-      end_time: s.end_time,
-      label: s.notes ?? null,
-      capacity: s.capacity,
-      bookings: bookingMap.get(s.id) || [],
-    }));
-
-    setGroups(combined);
-    setExpanded(new Set(upcoming.map((s: any) => s.id)));
-  };
-
-  useEffect(() => { load(); }, []);
+  }, []);
 
   const toggle = (id: string) =>
-    setExpanded(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const fmt = (d: string) => new Date(d).toLocaleString("en-US", {
     timeZone: "America/New_York", weekday: "short", month: "short",

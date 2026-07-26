@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CUFSC Ice Time
 
-## Getting Started
+Booking and administration system for Cornell University Figure Skating Club ice sessions.
 
-First, run the development server:
+## Architecture
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Next.js 16 and React 19 provide the browser UI.
+- Supabase Auth handles Google OAuth.
+- Supabase Postgres stores members, tiers, sessions, bookings, approvals, and the credit audit log.
+- PostgreSQL RPC functions are the authoritative business-logic and authorization boundary.
+- A Supabase Edge Function sends approval notifications through Resend.
+- Vercel hosts the frontend at `https://cufscice.vercel.app`.
+
+See [DESIGN.md](./DESIGN.md) for the technical design and [HANDOFF.md](./HANDOFF.md) for operations and deployment.
+
+## Local setup
+
+Requirements:
+
+- Node.js 20 or newer
+- Docker Desktop or another Docker-compatible runtime
+- Supabase CLI access to the project
+
+Create `.env.local`:
+
+```dotenv
+NEXT_PUBLIC_SUPABASE_URL=https://dtdyvpjmavurynbccjei.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<Supabase publishable key>
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` variable remains supported during key migration.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Install and run:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+npm run dev
+```
 
-## Learn More
+Useful checks:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run lint
+npm run build
+npx supabase start
+npx supabase db reset
+docker exec -i supabase_db_ice-booking \
+  psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
+  < supabase/tests/hardening_smoke.sql
+npx supabase stop
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Add `http://localhost:3000/auth/callback` to the Supabase Auth redirect allowlist before testing local Google login.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Database workflow
 
-## Deploy on Vercel
+The committed files under `supabase/migrations/` are the source of truth. Do not edit production functions or policies directly in the Dashboard. Create and test a migration locally, review `supabase db push --dry-run`, and only then apply it to the linked project.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The schema-only inspection dump at `supabase/schema.sql` is intentionally ignored because database webhook definitions can contain credentials.

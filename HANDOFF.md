@@ -1,182 +1,188 @@
-# CUFSC Ice Time Booking — Handoff Guide
+# CUFSC Ice Time — Operations and Handoff
 
-This guide is for someone taking over maintenance of the booking system. It assumes you have login credentials for all services and basic coding familiarity, but may be new to this specific workflow.
+This guide covers routine administration, development, deployment, and recovery.
 
----
+## Services
 
-## What You Have Access To
+| Service | Responsibility |
+|---|---|
+| GitHub | Source code and migration history |
+| Vercel | Frontend hosting and automatic deployments |
+| Supabase | PostgreSQL, Google OAuth, RLS, RPCs, Vault, cron, and Edge Functions |
+| Resend | Approval-notification email delivery |
 
-| Service | What it is | URL |
-|---|---|---|
-| GitHub | Stores the code | github.com |
-| Vercel | Hosts the live website | vercel.com |
-| Supabase | Database and backend | supabase.com |
-| Resend | Sends admin email notifications | resend.com |
+Production frontend: `https://cufscice.vercel.app`
 
----
+Supabase project reference: `dtdyvpjmavurynbccjei`
 
-## Setting Up Your Computer
+## Routine admin work
 
-You only need to do this once.
+- Add or edit a member: `/admin/users`
+- Add, edit, or remove a session: `/admin/sessions`
+- Review attendance: `/admin/bookings`
+- Approve or deny requests: `/admin/approvals`
+- Run the weekly credit reset manually: `/admin/tools`
 
-**1. Install Node.js**
-Download and install from nodejs.org. This is required to run the project locally.
+Admin UI visibility is checked in the browser, but PostgreSQL RPC authorization and RLS are the security boundary.
 
-**2. Install Git**
-Download from git-scm.com. This is how you send code changes to GitHub.
+## Developer setup
 
-**3. Install VS Code**
-Download from code.visualstudio.com. This is the code editor.
+Install Node.js 20+, Git, and Docker Desktop. Then:
 
-**4. Clone the repository**
-Open a terminal and run:
 ```bash
-git clone <your-github-repo-url>
-cd ice-booking
+git clone https://github.com/cornellskating-pop/cufsc_icetime.git
+cd cufsc_icetime
 npm install
+npx supabase login
+npx supabase link --project-ref dtdyvpjmavurynbccjei
 ```
-`npm install` downloads all the project's dependencies. Run it once after cloning.
 
-**5. Create the environment file**
-Create a file called `.env.local` in the root of the project folder with:
-```
+Create `.env.local`:
+
+```dotenv
 NEXT_PUBLIC_SUPABASE_URL=https://dtdyvpjmavurynbccjei.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<get this from Supabase dashboard → Settings → API>
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable key>
 ```
-This file connects your local copy to the Supabase database. Never commit this file to GitHub.
 
-**6. Enable local login (one-time Supabase setting)**
-The live site uses `https://cufscice.vercel.app` for Google login redirects. To make login work locally too, you need to add localhost as an allowed redirect URL:
-1. Go to supabase.com → your project → **Authentication → URL Configuration**
-2. Under **Redirect URLs**, click **Add URL**
-3. Add `http://localhost:3000/auth/callback`
+During the legacy-key transition, `NEXT_PUBLIC_SUPABASE_ANON_KEY` is also accepted.
 
-Without this step, clicking "Sign in with Google" on localhost will redirect back to the live site after login instead of your local copy.
+Add `http://localhost:3000/auth/callback` under Supabase Authentication → URL Configuration → Redirect URLs.
 
-**7. Run the app locally**
+Run:
+
 ```bash
 npm run dev
 ```
-Open your browser to `http://localhost:3000`. You're now running a local copy of the site. Changes you make to code will appear here instantly.
 
----
+## Required checks
 
-## How to Make and Deploy a Change
+Before proposing a deployment:
 
-This is the workflow you'll use every time you want to update the site.
-
-**1. Make your code change** in VS Code and save the file.
-
-**2. Test it locally** by checking `http://localhost:3000` in your browser.
-
-**3. To make update to live site: Open a terminal in the project folder and run:**
 ```bash
-git add .
-git commit -m "Brief description of what you changed"
+npm run lint
+npm run build
+npx supabase start
+npx supabase db reset
+docker exec -i supabase_db_ice-booking \
+  psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
+  < supabase/tests/hardening_smoke.sql
+npx supabase stop
+```
+
+The smoke test runs in a transaction and rolls back its test records.
+
+## Database changes
+
+Database changes must be committed as timestamped files in `supabase/migrations/`. Avoid direct production edits in the SQL Editor because they create drift between Git and Supabase.
+
+Normal workflow:
+
+```bash
+npx supabase migration new short_description
+# edit the generated SQL
+npx supabase db reset
+npx supabase db push --dry-run
+```
+
+Only run `npx supabase db push` after review and explicit production approval.
+
+### Initial baseline
+
+`20260726090000_remote_schema_baseline.sql` represents the database as it existed before migrations were brought into Git. It must be marked as already applied on the existing production project before the first push:
+
+```bash
+npx supabase migration repair --status applied 20260726090000
+npx supabase migration list
+npx supabase db push --dry-run
+```
+
+The dry run must show only migrations after the baseline. Never push the baseline onto the existing database.
+
+## Approval notification configuration
+
+The notification webhook uses a shared random value in two secure locations:
+
+1. Supabase Vault, named `notify_admins_webhook_secret`
+2. Edge Function secret `NOTIFY_WEBHOOK_SECRET`
+
+The values must match. Do not put the value in Git, chat, command history, or migration SQL.
+
+Other Edge Function variables:
+
+| Variable | Purpose |
+|---|---|
+| `RESEND_API_KEY` | Resend authentication |
+| `BACKEND_SECRET_KEY` | New `sb_secret_...` backend key; preferred over the legacy automatic service-role key |
+| `NOTIFY_EMAIL` | Optional comma-separated override recipients; otherwise all admin emails are used |
+| `FROM_EMAIL` | Verified Resend sender |
+| `APP_URL` | Defaults to `https://cufscice.vercel.app` |
+
+Deploy the function separately:
+
+```bash
+npx supabase functions deploy notify-admins --no-verify-jwt
+```
+
+The function authenticates database webhooks with `x-webhook-secret`; Supabase’s legacy JWT verification is intentionally disabled for this function.
+
+## Deployment order
+
+For an ordinary frontend-only change:
+
+```bash
 git push
 ```
 
-**4. Vercel automatically detects the push** and deploys the new version to the live site within about a minute. You can watch the progress at vercel.com.
+Vercel deploys the pushed branch automatically.
 
-That's the full cycle — edit, test locally, push to GitHub, Vercel deploys.
+For the first security migration:
 
----
+1. Confirm a current Supabase backup is available.
+2. Configure the matching Vault and Edge Function webhook secrets.
+3. Create a Supabase secret API key and set it as `BACKEND_SECRET_KEY`.
+4. Mark the baseline migration as applied.
+5. Run and review `supabase db push --dry-run`.
+6. Deploy `notify-admins` with `--no-verify-jwt`.
+7. Apply the database migration during a quiet period.
+8. Run the production verification checklist.
+9. Configure the Vercel publishable key and deploy the frontend.
+10. Verify key usage before deactivating legacy keys.
 
-## Common Admin Tasks (No Coding Required)
+The weekly reset cron job must use schedule `30 20,21 * * 0` and execute
+`select private.scheduled_weekly_reset_credits();`. Supabase cron schedules
+use UTC, so the job runs at both possible UTC equivalents of 4:30 PM Eastern.
+The worker checks `America/New_York` and performs the reset only for the
+invocation that is actually Sunday at 4:30 PM, keeping the schedule correct
+across daylight-saving transitions. `public.admin_weekly_reset_credits()`
+remains the authenticated manual admin RPC.
 
-These are done directly in the browser at the live site or in Supabase — no code changes needed.
+There can be a short notification gap between steps 6 and 7. Approval records remain in the database even if an email is missed.
 
-**Add a new member**
-Go to `/admin/users` → click "+ Add User" → fill in their details.
+## Production verification
 
-**Add a new ice session**
-Go to `/admin/sessions` → click "+ Add Session" → fill in the date, time, and capacity.
+- Existing member can sign in.
+- Non-member can submit one access request.
+- Member cannot enter `/admin`.
+- Admin can open every admin page.
+- Unreleased session cannot be booked through the RPC.
+- Normal booking deducts one credit.
+- Grace-period booking deducts no credit.
+- Cancelling a charged booking at least 30 minutes before start refunds one credit.
+- Cancelling a free or approved booking never creates a credit.
+- Capacity cannot be exceeded by concurrent requests.
+- Approval notification arrives and links to `https://cufscice.vercel.app/admin/approvals`.
+- Vercel and Supabase logs show no new errors.
 
-**Approve a booking or new member request**
-Go to `/admin/approvals` → click "Approve + Book" or "Approve + Add".
+## Recovery
 
-**Reset weekly credits manually**
-Go to `/admin/tools` → click "Run Now" on the Weekly Credit Reset tool.
-(This also runs automatically every Sunday at 4:30pm.)
+If the frontend deployment fails, use Vercel’s previous deployment while leaving the database migration in place. The hardened RPCs retain the existing frontend method names.
 
-**View who is attending a session**
-Go to `/admin/bookings` → click on any session to expand the attendee list.
+If the database migration fails, PostgreSQL rolls it back because it is transactional. Do not use `db reset --linked`.
 
----
+If notification delivery fails, approval requests are still stored. Inspect:
 
-## Project Structure (What's in Each Folder)
+- Supabase Edge Functions → `notify-admins` → Logs
+- Supabase Database → Webhook/pg_net logs
+- Resend → Logs
 
-```
-ice-booking/
-├── app/                  ← All the pages of the website
-│   ├── dashboard/        ← What members see when they log in
-│   └── admin/            ← Admin interface (sessions, users, bookings, approvals, tools)
-├── lib/
-│   ├── supabaseClient.ts ← Database connection (don't touch)
-│   └── ui.tsx            ← Shared visual components (buttons, nav bar, etc.)
-├── supabase/
-│   └── functions/
-│       └── notify-admins/
-│           └── index.ts  ← Email notification function (runs on Supabase, not locally)
-├── .env.local            ← Secret keys — never commit to GitHub
-└── DESIGN.md             ← Full technical design document
-```
-
----
-
-## Making Changes to the Database
-
-The database lives entirely in Supabase. To change how data is stored or how business logic works (e.g. how credits are deducted), you edit SQL functions in the Supabase dashboard:
-
-1. Go to supabase.com → your project
-2. Go to **Database → Functions** to view and edit the RPC functions
-3. Go to **SQL Editor** to run one-off queries or test changes
-
-Be careful here — changes to the database affect the live site immediately and can't be automatically undone.
-
----
-
-## Updating the Email Notification Function
-
-The `notify-admins` function runs on Supabase, not on Vercel, so pushing to GitHub does **not** update it. You have to deploy it separately.
-
-**One-time setup:**
-1. Install the Supabase CLI: `npm install -g supabase`
-2. Get a Supabase access token from supabase.com → Account → Access Tokens
-3. Run: `export SUPABASE_ACCESS_TOKEN=<your-token>`
-4. Run: `npx supabase link --project-ref dtdyvpjmavurynbccjei`
-
-**Every time you change the function:**
-```bash
-npx supabase functions deploy notify-admins
-```
-
----
-
-## If Something Breaks
-
-**The live site is down or showing errors:**
-- Check vercel.com → your project → Deployments to see if the last deployment failed
-- Check the deployment logs for error messages
-
-**A database operation is failing:**
-- Go to Supabase → **Edge Functions → notify-admins → Logs** (for email issues)
-- Go to Supabase → **Database → Logs** (for query errors)
-
-**Email notifications stopped working:**
-- Check Resend dashboard → Logs to see if emails are being attempted
-- Check Supabase → Edge Functions → notify-admins → Logs for errors
-
-**Something looks wrong with the data:**
-- Go to Supabase → **Table Editor** to view and manually edit rows
-- Use the **SQL Editor** to run queries if needed
-
----
-
-## Things to Know
-
-- **You never need to touch Vercel directly** for normal updates — just push to GitHub.
-- **`.env.local` is never committed to GitHub** — if you set up on a new computer you'll need to recreate it with the keys from Supabase.
-- **The database timezone is set to America/New_York.** All session times are stored in UTC and displayed in Eastern Time.
-- **Weekly credits reset automatically** every Sunday at 4:30pm ET via a scheduled database job. You can also trigger it manually from `/admin/tools`.
-- **The full technical reference** is in `DESIGN.md` if you need to understand how any part of the system works in depth.
+If a secret is exposed, revoke or replace it and inspect logs. Never commit a raw schema dump until its webhook headers have been reviewed and redacted.

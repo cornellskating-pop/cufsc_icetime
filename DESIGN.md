@@ -1,321 +1,205 @@
-# CUFSC Ice Time Booking System — Design Document 4/20/2026
+# CUFSC Ice Time — Technical Design
 
-This document describes the full architecture of the CUFSC (Cornell University Figure Skating Club) ice time booking web app, intended for maintainers who need to understand, modify, or extend the system.
+Last reconciled with the application and exported Supabase schema: July 26, 2026.
 
----
+## System boundary
 
-## 1. Overview
+The application is a thin Next.js client over Supabase:
 
-The system lets club members log in, view available ice sessions, and book spots. Admins manage sessions, users, bookings, and handle approval requests. Automated email alerts notify admins when new requests are submitted.
+```text
+Next.js browser UI
+  ├── Supabase Auth (Google OAuth)
+  ├── RLS-protected reads and views
+  └── PostgreSQL RPC functions
+        ├── booking and credit transactions
+        ├── admin operations
+        └── approval inserts
+              └── pg_net trigger
+                    └── Supabase Edge Function
+                          └── Resend
+```
 
----
+There is no custom Next.js API layer. Consequently, browser checks are usability controls; RPC authorization, RLS, constraints, and grants are authoritative.
 
-## 2. Technology Stack
+## Technology
 
 | Layer | Technology |
 |---|---|
-| Frontend framework | Next.js 14 (App Router) with React |
-| Language | TypeScript |
-| Styling | CSS variables + utility classes in `globals.css` |
-| Database + Auth + Backend | Supabase (PostgreSQL, Auth, Edge Functions, Webhooks) |
-| Email | Resend API |
-| Fonts | Google Fonts — Syne (headings), DM Sans (body) |
-| Deployment | Vercel |
+| Frontend | Next.js 16 App Router, React 19, TypeScript |
+| Styling | Global CSS variables/classes plus component inline styles |
+| Authentication | Supabase Auth with Google OAuth |
+| Backend | Supabase Postgres, RLS, views, SECURITY DEFINER RPCs |
+| Notification worker | Supabase Deno Edge Function |
+| Email | Resend |
+| Hosting | Vercel |
 
----
+All displayed session times use `America/New_York`. PostgreSQL stores `timestamptz` values in UTC.
 
-## 3. Platform Responsibilities
+## Routes
 
-### Next.js (this repository)
-Handles all UI and user interaction. Every page is a client-side React component that reads and writes data by calling Supabase RPC functions or querying views. There is no custom API layer — the frontend talks directly to Supabase.
+| Route | Purpose |
+|---|---|
+| `/` | Redirect according to authentication state |
+| `/login` | Start Google OAuth |
+| `/auth/callback` | Complete the browser session |
+| `/dashboard` | Member profile, sessions, bookings, and cancellations |
+| `/admin/sessions` | Session management |
+| `/admin/users` | Member and admin management |
+| `/admin/bookings` | Attendance |
+| `/admin/approvals` | New-member and booking approvals |
+| `/admin/tools` | Manual credit reset |
 
-### Supabase
-Acts as the entire backend:
-- **PostgreSQL database** stores all data (users, sessions, bookings, approval requests, tiers).
-- **RPC functions** (PL/pgSQL) encapsulate all business logic — booking, credit deduction, cancellations, admin operations. Clients call these via `supabase.rpc()`.
-- **Views** (`sessions_with_spots`, `my_bookings`) pre-compute derived data for common queries.
-- **Auth** manages Google OAuth sessions. User identity is available in SQL via `auth.uid()`.
-- **Row-Level Security (RLS)** controls which rows each user can read or write.
-- **Database Webhooks** fire HTTP requests to Edge Functions when data changes.
-- **Edge Functions** are Deno TypeScript functions deployed on Supabase infrastructure, used for tasks requiring external API calls (e.g., sending email).
+The admin layout verifies the current profile before mounting admin pages. Every admin RPC independently checks `is_admin()` as defense in depth.
 
-### Resend
-Third-party email service. The `notify-admins` Edge Function sends transactional email through Resend whenever a new approval request is created.
-
----
-
-## 4. Directory Structure
-
-```
-ice-booking/
-├── app/
-│   ├── globals.css          # CSS variables and shared component classes
-│   ├── layout.tsx           # Root layout (sets page title, imports fonts)
-│   ├── page.tsx             # Entry point — redirects to /login or /dashboard
-│   ├── login/page.tsx       # Google OAuth sign-in screen
-│   ├── auth/callback/page.tsx  # OAuth redirect handler
-│   ├── dashboard/page.tsx   # Member portal (browse sessions, book, cancel)
-│   └── admin/
-│       ├── layout.tsx       # Admin layout wrapper
-│       ├── page.tsx         # Redirects to /admin/sessions
-│       ├── sessions/page.tsx   # CRUD for ice sessions
-│       ├── users/page.tsx      # CRUD for club members
-│       ├── bookings/page.tsx   # Read-only view of who is in each session
-│       ├── approvals/page.tsx  # Manage new-user and session booking requests
-│       └── tools/page.tsx      # Admin utilities (e.g., weekly credit reset)
-├── lib/
-│   ├── supabaseClient.ts    # Exports a single shared Supabase client instance
-│   └── ui.tsx               # Shared UI components (buttons, badges, nav, etc.)
-├── supabase/
-│   └── functions/
-│       └── notify-admins/
-│           └── index.ts     # Edge function: emails admins on new approval requests
-├── .env.local               # Supabase URL and anon key (not committed to git)
-└── package.json
-```
-
----
-
-## 5. Authentication Flow
-
-1. User visits `/`. The page checks for an active Supabase session.
-   - No session → redirect to `/login`.
-   - Session exists → redirect to `/dashboard`.
-2. `/login` shows a "Sign in with Google" button. Clicking it starts a Supabase OAuth flow.
-3. Google redirects back to `/auth/callback`, which exchanges the OAuth code for a session and redirects to `/`.
-4. All subsequent pages call `supabase.auth.getSession()` or `supabase.auth.getUser()` to get the current user's ID and email.
-
-**Note**: Authentication checks are performed client-side on each page. Admin pages do not currently use Next.js middleware to block unauthenticated access; access control relies on Supabase RLS policies and the `is_admin` flag on the user record.
-
----
-
-## 6. Data Model (Key Tables)
+## Data model
 
 ### `users`
-Stores club member profiles. Separate from Supabase's built-in `auth.users` table.
 
-| Column | Type | Notes |
-|---|---|---|
-| `id` | uuid | Matches `auth.users.id` |
-| `email` | text | Cornell or other email |
-| `name` | text | Display name |
-| `tier` | text | e.g. `basic`, `temp`, `admin` |
-| `credits_balance` | integer | Current credits available to book |
-| `is_admin` | boolean | Grants access to `/admin` pages |
+| Column | Meaning |
+|---|---|
+| `id uuid` | Normally matches `auth.users.id` |
+| `email text` | Normalized lowercase login email |
+| `name text` | Display name |
+| `tier text` | Lowercase tier key |
+| `credits_balance integer` | Spendable weekly credits |
+| `is_admin boolean` | Administrative authority |
+| `paid_dues boolean` | Dues status |
+| `created_at timestamptz` | Creation time |
+
+Members can read their own profile but cannot update credit, tier, dues, or admin fields directly.
 
 ### `tiers`
-Defines tier properties.
 
-| Column | Notes |
-|---|---|
-| `name` | Tier identifier (e.g. `basic`) |
-| `weekly_credits` | Credits issued each week on reset |
+Maps a tier name to `weekly_credits`. Weekly reset matching is case-insensitive for compatibility with historical tier rows.
 
 ### `sessions`
-Ice time slots.
 
-| Column | Notes |
-|---|---|
-| `id` | Text ID set by admin (e.g. `SCT-2026-04-21-1800`) |
-| `notes` | Optional label shown to members |
-| `start_time` | timestamptz (stored in UTC) |
-| `end_time` | timestamptz (stored in UTC) |
-| `release_at` | timestamptz — session is not bookable before this time |
-| `capacity` | Max number of bookings |
+Contains ID, start/end time, optional release time, capacity, and notes. Database constraints require ordered times, release before start, and nonnegative capacity.
 
 ### `bookings`
-Links users to sessions.
 
-| Column | Notes |
-|---|---|
-| `id` | uuid |
-| `user_id` | FK → `users.id` |
-| `session_id` | FK → `sessions.id` |
-| `status` | `active` or `cancelled` |
-| `created_at` | When booking was made |
+Links a user and session. Active bookings are unique per user/session. `credit_charged` records whether the booking consumed a credit, preventing free grace or approved bookings from producing a refund.
 
 ### `approval_requests`
-Holds pending requests for admin review.
 
-| Column | Notes |
-|---|---|
-| `id` | uuid |
-| `type` | `SESSION` (member wants to book) or `NEW_USER` (someone wants to join) |
-| `status` | `OPEN`, `APPROVED`, or `DENIED` |
-| `user_id` | FK → `users.id` (null for NEW_USER requests) |
-| `session_id` | For SESSION type requests |
-| `requester_email` | Email of the person requesting (for NEW_USER) |
-| `created_at` | Timestamp |
+Represents `NEW_USER` and `SESSION` requests with `OPEN`, `APPROVED`, `DENIED`, or `FAILED` status and decision metadata.
 
----
+### `credit_audit`
 
-## 7. Key Business Logic (in Supabase RPC Functions)
+Records booking deductions and cancellation refunds. The log intentionally retains entries with a null user reference after member deletion.
 
-All business logic lives in PostgreSQL functions. The frontend is intentionally thin — it just calls RPCs and displays results.
+## Views
 
-### Booking a session (`book_sessions`)
-- Takes an array of session IDs.
-- For each session, checks: user exists, session is open, enough credits, spots available.
-- If user tier requires approval (e.g., `temp` tier with 0 credits), creates an `approval_requests` row instead of booking directly.
-- Returns an array of `{ ok: boolean, message: string }` — one entry per session.
-- On success, deducts 1 credit per session.
+### `sessions_with_spots`
 
-### Cancelling a booking (`cancel_booking`)
-- Takes a booking UUID (`booking_id`).
-- Marks the booking as `cancelled`.
-- Refunds 1 credit if cancelled at least 30 minutes before session start.
+Returns sessions with active capacity remaining. It needs owner-level access to count all active bookings, but only authenticated users receive `SELECT` permission.
 
-### Credit reset (`admin_weekly_reset_credits`)
-- Sets every user's `credits_balance` to their tier's `weekly_credits` value.
-- Intended to run on a schedule (cron) or manually from the admin Tools page.
+### `my_bookings`
 
-### Session management (`admin_upsert_session`, `admin_delete_session`)
-- Upsert creates or updates a session row.
-- Delete removes the session and all associated bookings.
+Runs with the caller’s permissions and combines the current user’s bookings with session times.
 
-### User management (`admin_upsert_user`, `admin_delete_user`)
-- Upsert creates or updates a user profile.
-- Delete removes the user and all associated data.
+Older duplicate admin views and the unused `me` view were removed. Admin data is returned only through checked RPCs.
 
-### Approvals
-- `admin_approve_request` — approves a SESSION request and creates the booking.
-- `admin_approve_user_request` — approves a NEW_USER request, creates the user profile, and optionally books a session.
-- `admin_deny_request` — marks any request as DENIED.
+## Booking transaction
 
----
+`book_sessions(text[])` is the single booking entry point.
 
-## 8. Time Zone Handling
+It:
 
-All session times are stored in UTC in the database. The database timezone is set to `America/New_York` for convenience in SQL functions, but API responses always return UTC ISO strings.
+1. Requires an authenticated member.
+2. Rejects empty, duplicate, null, or more than two session IDs.
+3. Locks the member row to serialize credit spending.
+4. Locks each session row to serialize capacity checks.
+5. Enforces `release_at`, start time, capacity, and duplicate-booking rules.
+6. Creates an approval request for a zero-credit temporary member.
+7. Allows a zero-credit booking in the 60-minute grace period.
+8. Records whether a credit was charged.
+9. Writes a credit audit entry when charging.
+10. Returns one structured result per requested session.
 
-**Display**: Every `toLocaleString()` call in the frontend passes `timeZone: "America/New_York"` explicitly so session times always appear in Eastern Time regardless of where the user's browser is.
+The former `book_session` function was removed to avoid maintaining a second, divergent ruleset.
 
-**Admin form inputs**: HTML `datetime-local` inputs produce strings with no timezone info. Two helper functions in `admin/sessions/page.tsx` handle the conversion:
-- `fromET(isoString)` — converts a UTC ISO string to an ET datetime-local string for pre-filling the edit form.
-- `toET(localString)` — appends the correct ET UTC offset (either `-05:00` or `-04:00` depending on DST) before sending to the database.
+## Cancellation transaction
 
----
+`cancel_booking(uuid)`:
 
-## 9. Member Dashboard
+- Requires ownership of an active booking.
+- Locks the booking and user row.
+- Permits cancellation until 30 minutes after session start.
+- Refunds only a booking that actually charged a credit and is cancelled at least 30 minutes before start.
+- Writes the refund to `credit_audit`.
 
-The dashboard (`/dashboard`) is the main interface for club members.
+## Admin transactions
 
-**On load**, it fetches:
-- The current user's profile from `users` (name, tier, credits).
-- Upcoming sessions from the `sessions_with_spots` view.
-- The user's recent bookings from the `my_bookings` view (last 7 days, most future first).
+All admin functions are SECURITY DEFINER, set a fixed search path, and call `is_admin()`:
 
-**If the user has no profile** (not yet a member), the dashboard shows a "Not yet a member" screen with a "Request Access" button. Clicking it calls `request_user_access()`, which creates a `NEW_USER` approval request. If a request is already pending, the button shows a waiting message instead.
+- `admin_list_sessions`
+- `admin_list_session_bookings_grouped`
+- `admin_list_users`
+- `admin_list_approvals`
+- `admin_upsert_session`
+- `admin_delete_session`
+- `admin_upsert_user`
+- `admin_delete_user`
+- `admin_approve_request`
+- `admin_approve_user_request`
+- `admin_deny_request`
+- `admin_weekly_reset_credits`
 
-**Session statuses** (displayed as colored badges):
-| Badge | Condition |
-|---|---|
-| Soon | `release_at` is in the future — not yet open for booking |
-| Open | Bookable |
-| Grace | Within 60 minutes of start — no credits deducted |
-| Full | No spots left |
-| Closed | Session has started with <30 min remaining |
-| Ended | Session is over |
+Approval and booking operations lock the affected rows. Approved temporary-member bookings do not charge a credit.
 
-**Booking**: Members can select up to 2 sessions at a time (limited by credits). Selecting and submitting calls `book_sessions()`. For `temp` tier users needing approval, the RPC automatically creates an approval request instead of booking directly.
+## Authorization
 
----
+- `anon` has no table or RPC access.
+- `authenticated` receives only required read grants and explicit RPC execution grants.
+- Browser writes occur through RPCs rather than direct table privileges.
+- Users can select only their own profile and bookings.
+- Admin RPCs protect member names, emails, credits, and attendance.
+- Default privileges no longer automatically expose new tables or functions.
 
-## 10. Admin Interface
+RLS remains enabled on users, sessions, bookings, approvals, tiers, and the credit audit table.
 
-All admin pages are under `/admin/` and share a top navigation bar (`AdminTopBar` from `lib/ui.tsx`).
+## Approval notifications
 
-| Page | Path | Purpose |
-|---|---|---|
-| Sessions | `/admin/sessions` | Create, edit, delete ice sessions |
-| Users | `/admin/users` | Create, edit, delete member profiles |
-| Bookings | `/admin/bookings` | View who is attending each session |
-| Approvals | `/admin/approvals` | Review and approve/deny requests |
-| Tools | `/admin/tools` | Run utilities (e.g., weekly credit reset) |
+An insert trigger calls the `notify-admins` Edge Function through `pg_net`.
 
-**Approvals** handles two request types in a single table:
-- **New User** requests show the requester's email. Approving creates a user profile with default settings.
-- **Session** requests show the member's name and the session they want. Approving creates the booking.
+Authentication uses a random shared value:
 
----
+- Database copy: Supabase Vault secret `notify_admins_webhook_secret`
+- Function copy: `NOTIFY_WEBHOOK_SECRET`
+- Request header: `x-webhook-secret`
 
-## 11. Email Notifications (Edge Function)
+The Edge Function:
 
-**File**: `supabase/functions/notify-admins/index.ts`
+1. Validates method and webhook secret.
+2. Reads only the approval ID from the payload.
+3. Reloads the authoritative approval record from PostgreSQL.
+4. Loads recipient addresses.
+5. Sends through Resend.
 
-**Trigger**: A Supabase Database Webhook fires on every INSERT into `approval_requests`, calling this function via HTTP.
+`NOTIFY_EMAIL` can override recipients with a comma-separated list; otherwise all current admin email addresses are used. `APP_URL`, `FROM_EMAIL`, and the backend key are configurable secrets.
 
-**What it does**:
-1. Receives the new row as a JSON payload.
-2. Queries `users` for all rows where `is_admin = true`.
-3. Composes a plain-text email based on request type (NEW_USER or SESSION).
-4. Sends the email to every admin address via the Resend API.
+The function is deployed with platform JWT verification disabled because it performs its own webhook authentication.
 
-**Environment variables required** (set via `npx supabase secrets set`):
-- `RESEND_API_KEY` — from your Resend dashboard
-- `SUPABASE_URL` — automatically injected by Supabase
-- `SUPABASE_SERVICE_ROLE_KEY` — automatically injected by Supabase
+## Repository structure
 
-**Deploying changes to the function**:
-```bash
-export SUPABASE_ACCESS_TOKEN=<your-token>
-npx supabase link --project-ref dtdyvpjmavurynbccjei
-npx supabase functions deploy notify-admins
+```text
+app/                         Next.js routes and UI
+lib/                         Shared Supabase client and UI components
+supabase/config.toml         Local stack and Edge Function configuration
+supabase/functions/          Edge Function source
+supabase/migrations/         Versioned database source of truth
+supabase/tests/              Transactional database smoke tests
+README.md                    Developer quick start
+HANDOFF.md                   Operations and deployment
+DESIGN.md                    This technical reference
 ```
 
----
+Schema inspection dumps are ignored. They can include database webhook headers even when they contain no table data.
 
-## 12. Shared UI Components (`lib/ui.tsx`)
+## Known operational dependencies
 
-| Component | Purpose |
-|---|---|
-| `LogoMark` | Red cubic SVG logo |
-| `Wordmark` | "CUFSC Ice Time" brand text |
-| `SpotBar` | Capacity fill bar (green → orange → red as capacity fills) |
-| `Avatar` | Circle with user's first initial |
-| `Loading` | Centered spinner with optional label |
-| `Msg` | Inline alert (success / error / info styles) |
-| `AdminTopBar` | Top nav with tabs for all admin sections |
-
----
-
-## 13. Styling
-
-Styles live in `app/globals.css`. The approach is CSS custom properties (variables) for the color palette, plus a set of reusable utility classes for common UI patterns.
-
-**Color palette** (key variables):
-| Variable | Value | Use |
-|---|---|---|
-| `--red` | `#B31B1B` | Cornell red, primary brand color |
-| `--ink` | Dark | Primary text and backgrounds |
-| `--muted` | Grey | Secondary text |
-| `--border` | Light grey | Card borders, separators |
-| `--success` | Green | Positive indicators |
-| `--warn` | Amber | Warning indicators |
-
-**Reusable classes**: `.card`, `.btn-primary`, `.btn-ghost`, `.btn-danger`, `.btn-link`, `.input`, `.input-sm`, `.data-table`, `.badge-{status}`, `.msg-{type}`
-
-Most component-specific layout uses inline `style={{}}` objects in JSX.
-
----
-
-## 14. Environment Variables
-
-| Variable | Where used | Purpose |
-|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Frontend | Supabase project API endpoint |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Frontend | Public anon key for Supabase client |
-| `RESEND_API_KEY` | Edge Function (Supabase secret) | Resend email API |
-
-The `.env.local` file holds the first two. Never commit it to git. The Resend key is stored as a Supabase secret, not in the repo.
-
----
-
-## 15. Known Limitations and Notes for Maintainers
-
-- **Admin access is not middleware-protected.** The `is_admin` flag is checked client-side. RLS policies in Supabase should be the authoritative guard — verify these are correctly configured before deploying to production.
-- **No optimistic updates.** After every write (book, cancel, approve, etc.), the full dataset is re-fetched from Supabase. This is simple and correct but adds a round-trip delay after each action.
-- **Single message state.** Each page has one `msg` / `msgType` state. If multiple things happen in quick succession, messages overwrite each other.
-- **Weekly credit reset is not automated in this repo.** The `admin_weekly_reset_credits` RPC can be triggered manually from the Tools page, or set up as a scheduled job in Supabase (Database → Scheduled Jobs / pg_cron).
-- **Email notifications are plain text.** The `notify-admins` function sends simple text emails. HTML templates could be added to Resend for better formatting.
-- **`from` email address in notify-admins** must be a domain verified in your Resend account. Currently set to `cornellskating@gmail.com` — update this if the sending domain changes.
+- The weekly reset schedule lives in Supabase’s cron schema and must be verified separately from the public-schema baseline.
+- The login ID synchronization trigger lives under Auth-managed objects and is not represented by the public-schema dump.
+- The sender address must be verified in Resend before changing `FROM_EMAIL`.
+- Legacy Supabase API keys should be deactivated only after the frontend uses a publishable key and the Edge Function uses a secret backend key.

@@ -1,27 +1,68 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY")!;
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const FROM_EMAIL = "CUFSC Booking <onboarding@resend.dev>";
-const APP_URL = "https://ice-booking.vercel.app";
+type ApprovalRecord = {
+  id: string;
+  type: "NEW_USER" | "SESSION";
+  requester_email: string | null;
+  user_id: string | null;
+  session_id: string | null;
+};
+
+type WebhookPayload = {
+  record?: { id?: unknown };
+};
+
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+const BACKEND_SECRET_KEY =
+  Deno.env.get("BACKEND_SECRET_KEY") ??
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+const WEBHOOK_SECRET = Deno.env.get("NOTIFY_WEBHOOK_SECRET");
+const FROM_EMAIL = Deno.env.get("FROM_EMAIL") ?? "CUFSC Booking <onboarding@resend.dev>";
+const APP_URL = Deno.env.get("APP_URL") ?? "https://cufscice.vercel.app";
 
 Deno.serve(async (req) => {
   try {
-    const payload = await req.json();
-    const row = payload.record;
+    if (req.method !== "POST") {
+      return new Response("Method not allowed", { status: 405 });
+    }
+    if (!WEBHOOK_SECRET || req.headers.get("x-webhook-secret") !== WEBHOOK_SECRET) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+    if (!RESEND_API_KEY || !SUPABASE_URL || !BACKEND_SECRET_KEY) {
+      throw new Error("Required function secrets are not configured");
+    }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const payload = await req.json() as WebhookPayload;
+    const approvalId = typeof payload.record?.id === "string" ? payload.record.id : null;
+    if (!approvalId) {
+      return new Response("Invalid webhook payload", { status: 400 });
+    }
+
+    const supabase = createClient(SUPABASE_URL, BACKEND_SECRET_KEY);
+
+    const { data: row, error: requestError } = await supabase
+      .from("approval_requests")
+      .select("id, type, requester_email, user_id, session_id")
+      .eq("id", approvalId)
+      .single<ApprovalRecord>();
+    if (requestError || !row) throw requestError ?? new Error("Approval request not found");
 
     const { data: admins, error: adminErr } = await supabase
       .from("users")
-      .select("email, name")
+      .select("email")
       .eq("is_admin", true);
 
     if (adminErr) throw adminErr;
-    if (!admins || admins.length === 0) {
-      return new Response("No admins found", { status: 200 });
-    }
+
+    const configuredRecipients = (Deno.env.get("NOTIFY_EMAIL") ?? "")
+      .split(",")
+      .map(email => email.trim())
+      .filter(Boolean);
+    const recipients = configuredRecipients.length > 0
+      ? configuredRecipients
+      : [...new Set((admins ?? []).map(admin => admin.email).filter(Boolean))];
+    if (recipients.length === 0) return new Response("No notification recipients", { status: 200 });
 
     let subject: string;
     let body: string;
@@ -36,20 +77,14 @@ Review and approve or deny at: ${APP_URL}/admin/approvals`;
     } else {
       subject = "New session booking request — CUFSC Booking";
 
-      const { data: reqData } = await supabase
-        .from("approval_requests")
-        .select("user_id, session_id")
-        .eq("id", row.id)
-        .single();
-
       let userEmail = "";
-      let sessionId = row.session_id ?? "";
+      const sessionId = row.session_id ?? "";
 
-      if (reqData?.user_id) {
+      if (row.user_id) {
         const { data: u } = await supabase
           .from("users")
           .select("email, name")
-          .eq("id", reqData.user_id)
+          .eq("id", row.user_id)
           .single();
         if (u) userEmail = `${u.name ?? ""} <${u.email}>`.trim();
       }
@@ -62,8 +97,6 @@ Session: ${sessionId}
 Review and approve or deny at: ${APP_URL}/admin/approvals`;
     }
 
-    const NOTIFY_EMAIL = Deno.env.get("NOTIFY_EMAIL") ?? "cornellskating@gmail.com";
-
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -72,13 +105,14 @@ Review and approve or deny at: ${APP_URL}/admin/approvals`;
       },
       body: JSON.stringify({
         from: FROM_EMAIL,
-        to: NOTIFY_EMAIL,
+        to: recipients,
         subject,
         text: body,
       }),
     });
-    const data = await res.json();
-    console.log(`Resend → ${NOTIFY_EMAIL}: ${res.status}`, JSON.stringify(data));
+    if (!res.ok) {
+      throw new Error(`Resend returned ${res.status}: ${await res.text()}`);
+    }
 
     return new Response("OK", { status: 200 });
   } catch (err) {
