@@ -44,7 +44,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://dtdyvpjmavurynbccjei.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable key>
 ```
 
-During the legacy-key transition, `NEXT_PUBLIC_SUPABASE_ANON_KEY` is also accepted.
+Do not use the legacy JWT-based `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 
 Add `http://localhost:3000/auth/callback` under Supabase Authentication → URL Configuration → Redirect URLs.
 
@@ -146,7 +146,7 @@ For the first security migration:
 7. Apply the database migration during a quiet period.
 8. Run the production verification checklist.
 9. Configure the Vercel publishable key and deploy the frontend.
-10. Verify key usage before deactivating legacy keys.
+10. Verify key usage, then deactivate the legacy keys.
 
 The weekly reset cron job must use schedule `30 20,21 * * 0` and execute
 `select private.scheduled_weekly_reset_credits();`. Supabase cron schedules

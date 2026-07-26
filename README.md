@@ -28,7 +28,8 @@ NEXT_PUBLIC_SUPABASE_URL=https://dtdyvpjmavurynbccjei.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<Supabase publishable key>
 ```
 
-The legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` variable remains supported during key migration.
+Legacy JWT-based `anon` and `service_role` API keys are not supported. Use a
+publishable key in browser code and a secret key only in trusted backend code.
 
 Install and run:
 
