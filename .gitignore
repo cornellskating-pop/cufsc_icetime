@@ -35,6 +35,7 @@ yarn-error.log*
 
 # local database inspection dumps (may contain embedded webhook credentials)
 /supabase/schema.sql
+/.backups/
 
 # vercel
 .vercel
