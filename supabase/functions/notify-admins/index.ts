@@ -25,6 +25,15 @@ const BACKEND_SECRET_KEY = (() => {
 const WEBHOOK_SECRET = Deno.env.get("NOTIFY_WEBHOOK_SECRET");
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") ?? "CUFSC Booking <onboarding@resend.dev>";
 const APP_URL = Deno.env.get("APP_URL") ?? "https://cufscice.vercel.app";
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const validUniqueEmails = (emails: Array<string | null | undefined>) => [
+  ...new Set(
+    emails
+      .map(email => email?.trim() ?? "")
+      .filter(email => EMAIL_PATTERN.test(email)),
+  ),
+];
 
 Deno.serve(async (req) => {
   try {
@@ -60,13 +69,12 @@ Deno.serve(async (req) => {
 
     if (adminErr) throw adminErr;
 
-    const configuredRecipients = (Deno.env.get("NOTIFY_EMAIL") ?? "")
-      .split(",")
-      .map(email => email.trim())
-      .filter(Boolean);
+    const configuredRecipients = validUniqueEmails(
+      (Deno.env.get("NOTIFY_EMAIL") ?? "").split(","),
+    );
     const recipients = configuredRecipients.length > 0
       ? configuredRecipients
-      : [...new Set((admins ?? []).map(admin => admin.email).filter(Boolean))];
+      : validUniqueEmails((admins ?? []).map(admin => admin.email));
     if (recipients.length === 0) return new Response("No notification recipients", { status: 200 });
 
     let subject: string;
