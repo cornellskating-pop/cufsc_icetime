@@ -112,7 +112,7 @@ Other Edge Function variables:
 | Variable | Purpose |
 |---|---|
 | `RESEND_API_KEY` | Resend authentication |
-| `BACKEND_SECRET_KEY` | New `sb_secret_...` backend key; preferred over the legacy automatic service-role key |
+| `SUPABASE_SECRET_KEYS` | Supabase-managed JSON map; the function reads its `default` secret key |
 | `NOTIFY_EMAIL` | Optional comma-separated override recipients; otherwise all admin emails are used |
 | `FROM_EMAIL` | Verified Resend sender |
 | `APP_URL` | Defaults to `https://cufscice.vercel.app` |
@@ -139,7 +139,7 @@ For the first security migration:
 
 1. Confirm a current Supabase backup is available.
 2. Configure the matching Vault and Edge Function webhook secrets.
-3. Create a Supabase secret API key and set it as `BACKEND_SECRET_KEY`.
+3. Confirm the Supabase-managed `SUPABASE_SECRET_KEYS` default secret is available.
 4. Mark the baseline migration as applied.
 5. Run and review `supabase db push --dry-run`.
 6. Deploy `notify-admins` with `--no-verify-jwt`.

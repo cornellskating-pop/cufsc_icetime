@@ -14,7 +14,14 @@ type WebhookPayload = {
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-const BACKEND_SECRET_KEY = Deno.env.get("BACKEND_SECRET_KEY");
+const BACKEND_SECRET_KEY = (() => {
+  try {
+    const secretKeys = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}");
+    return secretKeys.default as string | undefined;
+  } catch {
+    return undefined;
+  }
+})();
 const WEBHOOK_SECRET = Deno.env.get("NOTIFY_WEBHOOK_SECRET");
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") ?? "CUFSC Booking <onboarding@resend.dev>";
 const APP_URL = Deno.env.get("APP_URL") ?? "https://cufscice.vercel.app";
