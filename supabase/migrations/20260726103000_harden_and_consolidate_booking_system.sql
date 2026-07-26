@@ -515,21 +515,28 @@ begin
 end;
 $$;
 
--- Preserve the production job's existing name and schedule, but point it at
--- the database-only worker. Dynamic SQL keeps local replay compatible when
+-- Preserve the production job's existing name, but update it through pg_cron's
+-- supported API. Dynamic job discovery keeps local replay compatible when
 -- pg_cron is not installed.
 do $$
 declare
   v_updated integer := 0;
+  v_job_id bigint;
 begin
   if to_regclass('cron.job') is not null then
-    execute $statement$
-      update cron.job
-      set schedule = '30 20,21 * * 0',
-          command = 'select private.scheduled_weekly_reset_credits();'
+    for v_job_id in execute $statement$
+      select jobid
+      from cron.job
       where lower(command) like '%admin_weekly_reset_credits%'
-    $statement$;
-    get diagnostics v_updated = row_count;
+    $statement$
+    loop
+      perform cron.alter_job(
+        job_id := v_job_id,
+        schedule := '30 20,21 * * 0',
+        command := 'select private.scheduled_weekly_reset_credits();'
+      );
+      v_updated := v_updated + 1;
+    end loop;
   end if;
 
   if v_updated = 0 then
