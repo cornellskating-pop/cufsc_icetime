@@ -1,17 +1,23 @@
 "use client";
 import React from "react";
+import Image from "next/image";
 
 export function LogoMark({ size = 32 }: { size?: number }) {
   return (
-    <div style={{ width: size, height: size, background: "var(--red)", borderRadius: size * 0.2,
-      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-      <svg width={size * 0.55} height={size * 0.55} viewBox="0 0 24 24" fill="none"
-        stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-        <path d="M2 17l10 5 10-5"/>
-        <path d="M2 12l10 5 10-5"/>
-      </svg>
-    </div>
+    <Image
+      src="/cufsc-logo-cropped.png"
+      alt="CUFSC skate logo"
+      width={size}
+      height={size}
+      priority
+      style={{
+        width: size,
+        height: size,
+        objectFit: "contain",
+        flexShrink: 0,
+        filter: "drop-shadow(0 2px 3px rgba(35, 25, 25, .14))",
+      }}
+    />
   );
 }
 

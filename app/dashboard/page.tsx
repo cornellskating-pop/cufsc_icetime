@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
-import { Loading, Msg, SpotBar } from "../../lib/ui";
+import { Loading, LogoMark, Msg, SpotBar } from "../../lib/ui";
 
 type Session = {
   id: string;
@@ -335,10 +335,8 @@ export default function Dashboard() {
   if (!profile) return (
     <div style={{ minHeight: "100vh", background: CREAM, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ maxWidth: 400, width: "90%", textAlign: "center" }}>
-        <div style={{ width: 48, height: 48, background: RED, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2L2 7l10 5 10-5-10-5z" /><path d="M2 17l10 5 10-5" /><path d="M2 12l10 5 10-5" />
-          </svg>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
+          <LogoMark size={58} />
         </div>
         <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 22, marginBottom: 8 }}>Not yet a member</div>
         <div style={{ fontSize: 13, color: MUTED, marginBottom: 24 }}>
@@ -372,48 +370,23 @@ export default function Dashboard() {
   );
 
   return (
-    <div style={{ background: CREAM, minHeight: "100vh" }}>
+    <div style={{ background: "transparent", minHeight: "100vh" }}>
       <nav
         style={{
-          background: "white",
+          background: "rgba(250,248,245,.94)",
           borderBottom: `1px solid ${BORDER}`,
           padding: "0 28px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          height: 60,
+          height: 68,
           position: "sticky",
           top: 0,
           zIndex: 50,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div
-            style={{
-              width: 30,
-              height: 30,
-              background: RED,
-              borderRadius: 6,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="white"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path d="M2 17l10 5 10-5" />
-              <path d="M2 12l10 5 10-5" />
-            </svg>
-          </div>
+          <LogoMark size={42} />
           <span
             style={{
               fontFamily: "'Syne',sans-serif",
@@ -426,7 +399,7 @@ export default function Dashboard() {
           </span>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <div className="dashboard-nav-actions" style={{ display: "flex", alignItems: "center", gap: 14 }}>
           {profile?.is_admin && (
             <a
               href="/admin"
@@ -435,7 +408,7 @@ export default function Dashboard() {
               Admin ↗
             </a>
           )}
-          <span style={{ fontSize: 12, color: MUTED }}>{profile?.email}</span>
+          <span className="dashboard-nav-email" style={{ fontSize: 12, color: MUTED }}>{profile?.email}</span>
           <span
             style={{
               background: RED_LIGHT,
@@ -455,77 +428,61 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      <div
-        style={{
-          background: "var(--ink)",
-          padding: "40px 28px",
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
+      <div style={{ padding: "44px 28px 26px" }}>
         <div
+          className="dashboard-hero"
           style={{
-            position: "absolute",
-            right: -80,
-            top: -80,
-            width: 400,
-            height: 400,
-            background: "radial-gradient(circle, rgba(179,27,27,0.22) 0%, transparent 70%)",
-            pointerEvents: "none",
+            maxWidth: 900,
+            margin: "0 auto",
+            display: "grid",
+            gridTemplateColumns: "1.25fr .75fr",
+            gap: 24,
+            alignItems: "center",
           }}
-        />
-        <div style={{ maxWidth: 900, margin: "0 auto", position: "relative", zIndex: 1 }}>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: "0.14em",
-              textTransform: "uppercase",
-              color: "var(--ice-mid)",
-              marginBottom: 10,
-            }}
-          >
-            Cornell University Figure Skating Club
-          </div>
-          <div
-            style={{
-              fontFamily: "'Syne',sans-serif",
-              fontWeight: 800,
-              fontSize: "clamp(28px,4vw,44px)",
-              lineHeight: 1.05,
-              letterSpacing: "-0.03em",
-              color: "white",
-              marginBottom: 10,
-            }}
-          >
-            Book Your
-            <br />
-            <span style={{ color: RED }}>Ice Time</span>
-          </div>
-          <div style={{ fontSize: 13, color: "#999", fontWeight: 300, marginBottom: 28, maxWidth: 420 }}>
-            Select up to 2 sessions. Credits deducted at booking and refunded if cancelled ≥ 30 min before start.
-          </div>
-          <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
-            {[
-              [String(credits), "Credits Left"],
-              [profile?.tier ?? "—", "Tier"],
-              [String(myBookings.length), "Active Bookings"],
-            ].map(([n, l]) => (
-              <div key={l} style={{ borderLeft: `2px solid ${RED}`, paddingLeft: 14 }}>
-                <div
-                  style={{
-                    fontFamily: "'Syne',sans-serif",
-                    fontSize: 24,
-                    fontWeight: 800,
-                    color: "white",
-                    lineHeight: 1,
-                  }}
-                >
-                  {n}
+        >
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: MUTED, marginBottom: 10 }}>
+              Cornell University Figure Skating Club
+            </div>
+            <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: "clamp(30px,4vw,46px)", lineHeight: 1.04, letterSpacing: "-0.04em", color: INK, marginBottom: 12 }}>
+              Find your next moment
+              <br />
+              <span style={{ color: RED }}>on the ice.</span>
+            </div>
+            <div style={{ fontSize: 13, color: MUTED, marginBottom: 24, maxWidth: 480 }}>
+              Select up to 2 sessions. Credits are deducted at booking and refunded if cancelled at least 30 minutes before start.
+            </div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              {[
+                [String(credits), "Credits left"],
+                [profile?.tier ?? "—", "Member tier"],
+                [String(myBookings.length), "Active bookings"],
+              ].map(([n, l]) => (
+                <div key={l} style={{ minWidth: 118, padding: "12px 15px", border: `1px solid ${BORDER}`, borderRadius: 16, background: "rgba(255,255,255,.72)", boxShadow: "0 5px 14px rgba(47,39,38,.05)" }}>
+                  <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 19, fontWeight: 800, color: RED }}>{n}</div>
+                  <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>{l}</div>
                 </div>
-                <div style={{ fontSize: 11, color: "#888", marginTop: 3 }}>{l}</div>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+
+          <div style={{ padding: 22, borderRadius: 22, background: "rgba(255,255,255,.82)", border: `1px solid ${BORDER}`, boxShadow: "0 10px 28px rgba(46,36,35,.07)" }}>
+            <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: ".12em" }}>
+              Next open session
+            </div>
+            {visibleSessions[0] ? (
+              <>
+                <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 18, marginTop: 12 }}>
+                  {formatET(visibleSessions[0].start_time)}
+                </div>
+                <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>
+                  {visibleSessions[0].spots_left} spot{visibleSessions[0].spots_left !== 1 ? "s" : ""} remaining
+                </div>
+              </>
+            ) : (
+              <div style={{ fontSize: 13, color: MUTED, marginTop: 12 }}>No upcoming sessions.</div>
+            )}
+            <div style={{ height: 5, borderRadius: 5, marginTop: 24, background: "linear-gradient(90deg, var(--red) 0 48%, var(--border) 48% 53%, var(--ice-mid) 53% 100%)" }} />
           </div>
         </div>
       </div>
@@ -759,6 +716,9 @@ export default function Dashboard() {
       <style>{`
         @media (max-width: 680px) {
           .dashboard-grid { grid-template-columns: 1fr !important; }
+          .dashboard-hero { grid-template-columns: 1fr !important; }
+          .dashboard-nav-email { display: none; }
+          .dashboard-nav-actions { gap: 7px !important; }
         }
       `}</style>
     </div>

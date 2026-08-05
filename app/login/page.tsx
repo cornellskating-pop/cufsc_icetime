@@ -16,7 +16,7 @@ export default function LoginPage() {
     <div
       style={{
         minHeight: "100vh",
-        background: "var(--ink)",
+        background: "linear-gradient(145deg, var(--cream), var(--ice))",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -25,17 +25,11 @@ export default function LoginPage() {
         overflow: "hidden",
       }}
     >
-      {/* background glow */}
+      {/* restrained ice accents */}
       <div style={{
-        position: "absolute", left: "-10%", bottom: "-10%",
-        width: 600, height: 600,
-        background: "radial-gradient(circle, rgba(179,27,27,0.15) 0%, transparent 65%)",
-        pointerEvents: "none",
-      }} />
-      <div style={{
-        position: "absolute", right: "-5%", top: "-5%",
-        width: 400, height: 400,
-        background: "radial-gradient(circle, rgba(179,27,27,0.08) 0%, transparent 70%)",
+        position: "absolute", left: 0, right: 0, bottom: "14%",
+        height: 5,
+        background: "linear-gradient(90deg, var(--red) 0 47%, var(--border) 47% 52%, var(--ice-mid) 52% 100%)",
         pointerEvents: "none",
       }} />
 
@@ -43,13 +37,15 @@ export default function LoginPage() {
       <div
         className="fade-up"
         style={{
-          background: "var(--white)",
+          background: "rgba(255,255,255,.9)",
+          border: "1px solid var(--border)",
           borderRadius: 20,
           padding: "48px 40px",
           width: "100%",
           maxWidth: 400,
           position: "relative",
           zIndex: 1,
+          boxShadow: "0 12px 32px rgba(46,36,35,.08)",
         }}
       >
         {/* logo */}
