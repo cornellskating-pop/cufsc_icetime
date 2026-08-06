@@ -10,7 +10,8 @@ type Session = {
   end_time: string;
   release_at: string | null;
   capacity: number;
-  label: string | null;
+  label?: string | null;
+  notes?: string | null;
   spots_left: number;
 };
 
@@ -235,7 +236,7 @@ function BookedSnowOverlay() {
 }
 
 function isShowSession(session: Session) {
-  return session.label?.toLowerCase().includes("show") ?? false;
+  return (session.label ?? session.notes)?.toLowerCase().includes("show") ?? false;
 }
 
 function SessionRow({
@@ -465,7 +466,7 @@ function CalendarView({
                         className={`calendar-session-block status-${status} timeline-${timeline.phase}${checked ? " selected" : ""}${booked ? " booked" : ""}${showSession ? " show-session" : ""}`}
                         disabled={disabled}
                         onClick={() => onToggle(session.id)}
-                        title={`${session.label || "Ice session"} · ${formatET(session.start_time)} · ${timeline.primary}${timeline.secondary ? ` · ${timeline.secondary}` : ""}`}
+                        title={`${session.label || session.notes || "Ice session"} · ${formatET(session.start_time)} · ${timeline.primary}${timeline.secondary ? ` · ${timeline.secondary}` : ""}`}
                         aria-pressed={checked || booked}
                         key={session.id}
                       >
