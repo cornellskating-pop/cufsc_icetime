@@ -658,7 +658,7 @@ export default function Dashboard() {
         <div
           className="dashboard-hero"
           style={{
-            maxWidth: 900,
+            maxWidth: 1100,
             margin: "0 auto",
             display: "grid",
             gridTemplateColumns: "1.25fr .75fr",
@@ -716,11 +716,11 @@ export default function Dashboard() {
       <div
         className="dashboard-grid"
         style={{
-          maxWidth: 900,
+          maxWidth: 1100,
           margin: "0 auto",
           padding: "28px 24px 80px",
           display: "grid",
-          gridTemplateColumns: "1fr 300px",
+          gridTemplateColumns: "minmax(0, 1fr) 300px",
           gap: 24,
           alignItems: "start",
         }}
@@ -1150,8 +1150,7 @@ export default function Dashboard() {
           display: flex;
           flex-direction: column;
         }
-        .calendar-session-time,
-        .calendar-session-status {
+        .calendar-session-time {
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
@@ -1163,7 +1162,10 @@ export default function Dashboard() {
         .calendar-session-status {
           margin-top: 1px;
           font-size: 8px;
+          line-height: 1.15;
           opacity: .88;
+          overflow: visible;
+          white-space: normal;
         }
         @media (max-width: 680px) {
           .dashboard-grid { grid-template-columns: 1fr !important; }
