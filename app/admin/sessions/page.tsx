@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../../lib/supabaseClient";
 import { AdminTopBar, Msg } from "../../../lib/ui";
 
@@ -24,11 +24,12 @@ export default function AdminSessions() {
   const [msgType, setMsgType] = useState<"success"|"error"|"info">("info");
   const [showForm, setShowForm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
+  const [startSort, setStartSort] = useState<"asc" | "desc">("desc");
 
   const load = async () => {
     const { data, error } = await supabase.rpc("admin_list_sessions");
     if (error) { setMsg(error.message); setMsgType("error"); return; }
-    setRows(((data || []) as Row[]).reverse());
+    setRows((data || []) as Row[]);
   };
 
   useEffect(() => {
@@ -38,9 +39,18 @@ export default function AdminSessions() {
         setMsgType("error");
         return;
       }
-      setRows(((data || []) as Row[]).reverse());
+      setRows((data || []) as Row[]);
     });
   }, []);
+
+  const sortedRows = useMemo(
+    () => [...rows].sort((a, b) => {
+      const timeDifference = new Date(a.start_time).getTime() - new Date(b.start_time).getTime();
+      if (timeDifference !== 0) return startSort === "asc" ? timeDifference : -timeDifference;
+      return startSort === "asc" ? a.id.localeCompare(b.id) : b.id.localeCompare(a.id);
+    }),
+    [rows, startSort]
+  );
 
   const edit = (r: Row) => {
     setForm({
@@ -160,7 +170,19 @@ export default function AdminSessions() {
                 <tr>
                   <th>ID</th>
                   <th>Label</th>
-                  <th>Start</th>
+                  <th aria-sort={startSort === "asc" ? "ascending" : "descending"}>
+                    <button
+                      type="button"
+                      className="admin-start-sort"
+                      onClick={() => setStartSort(current => current === "asc" ? "desc" : "asc")}
+                      aria-label={`Sort start date ${startSort === "asc" ? "descending" : "ascending"}`}
+                    >
+                      Start
+                      <span className="admin-start-sort-arrow" aria-hidden="true">
+                        {startSort === "asc" ? "↑" : "↓"}
+                      </span>
+                    </button>
+                  </th>
                   <th>End</th>
                   <th>Release</th>
                   <th>Capacity</th>
@@ -169,7 +191,7 @@ export default function AdminSessions() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map(r => {
+                {sortedRows.map(r => {
                   const booked = r.capacity - (r.spots_left ?? r.capacity);
                   return (
                     <tr key={r.id}>
@@ -209,6 +231,39 @@ export default function AdminSessions() {
         </div>
       </div>
     </div>
+
+    <style>{`
+      .admin-start-sort {
+        margin: 0;
+        padding: 0;
+        border: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        font: inherit;
+        letter-spacing: inherit;
+        text-transform: inherit;
+      }
+      .admin-start-sort:hover,
+      .admin-start-sort:focus-visible {
+        color: var(--red);
+      }
+      .admin-start-sort:focus-visible {
+        border-radius: 4px;
+        outline: 2px solid var(--red-light);
+        outline-offset: 3px;
+      }
+      .admin-start-sort-arrow {
+        width: 10px;
+        color: var(--red);
+        font-size: 11px;
+        line-height: 1;
+        text-align: center;
+      }
+    `}</style>
 
     {deleteTarget && (
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100,
