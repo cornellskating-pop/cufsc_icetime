@@ -750,13 +750,20 @@ export default function Dashboard() {
               Cornell University Figure Skating Club
             </div>
             <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: "clamp(30px,4vw,46px)", lineHeight: 1.04, letterSpacing: "-0.04em", color: INK, marginBottom: 12 }}>
-              Find your next moment
+              Book your ice time
               <br />
-              <span style={{ color: RED }}>on the ice.</span>
+              <span style={{ color: RED }}>here.</span>
             </div>
-            <div style={{ fontSize: 13, color: MUTED, marginBottom: 24, maxWidth: 480 }}>
-              Select up to 2 sessions. Credits are deducted at booking and refunded if cancelled at least 30 minutes before start.
-            </div>
+            <ul className="booking-rules">
+              <li>One session per credit.</li>
+              <li>You can select and book up to two sessions at a time.</li>
+              <li>Charged credits are refunded when cancelled at least 30 minutes before start.</li>
+              <li>
+                During the final 60 minutes before start, a released session with space can be booked
+                without using a credit. Temporary accounts without credits require approval.
+              </li>
+              <li>Booking closes at the session start; cancellation closes 30 minutes after start.</li>
+            </ul>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               {[
                 [String(credits), "Credits left"],
@@ -1066,6 +1073,20 @@ export default function Dashboard() {
           align-items: center;
           gap: 12px;
         }
+        .booking-rules {
+          max-width: 590px;
+          margin: 0 0 22px;
+          padding-left: 18px;
+          color: ${MUTED};
+          font-size: 11.5px;
+          line-height: 1.4;
+        }
+        .booking-rules li + li {
+          margin-top: 3px;
+        }
+        .booking-rules li::marker {
+          color: ${RED};
+        }
         .session-view-toggle {
           display: flex;
           padding: 3px;
@@ -1328,6 +1349,7 @@ export default function Dashboard() {
           }
           .dashboard-hero-shell { padding: 30px 18px 0 !important; }
           .dashboard-hero { grid-template-columns: 1fr !important; }
+          .booking-rules { font-size: 11px; margin-bottom: 20px; }
           .dashboard-nav-email { display: none; }
           .dashboard-nav-actions { gap: 7px !important; }
           .dashboard-profile-spacer { display: none; }
