@@ -101,18 +101,66 @@ function formatCalendarTime(value: string) {
   });
 }
 
+function formatCountdownAmount(remainingMs: number) {
+  if (remainingMs >= 48 * 60 * 60 * 1000) {
+    return `${Math.ceil(remainingMs / (24 * 60 * 60 * 1000))}d`;
+  }
+  if (remainingMs >= 60 * 60 * 1000) {
+    return `${Math.ceil(remainingMs / (60 * 60 * 1000))}h`;
+  }
+  return `${Math.max(1, Math.ceil(remainingMs / (60 * 1000)))}m`;
+}
+
 function formatAvailabilityCountdown(releaseAt: string | null, nowMs: number) {
   if (!releaseAt) return null;
 
   const remaining = new Date(releaseAt).getTime() - nowMs;
   if (remaining <= 0) return null;
-  if (remaining >= 48 * 60 * 60 * 1000) {
-    return `Opens in ${Math.ceil(remaining / (24 * 60 * 60 * 1000))}d`;
+  return `Opens in ${formatCountdownAmount(remaining)}`;
+}
+
+function formatElapsedAmount(elapsedMs: number) {
+  const totalMinutes = Math.max(0, Math.floor(elapsedMs / (60 * 1000)));
+  if (totalMinutes < 1) return "Just started";
+  if (totalMinutes < 60) return `${totalMinutes}m`;
+
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+}
+
+type TimelinePhase = "upcoming" | "in-progress" | "ended";
+
+function getSessionTimeline(
+  session: Session,
+  nowMs: number,
+  upcomingSecondary?: string
+): { phase: TimelinePhase; primary: string; secondary?: string } {
+  const startMs = new Date(session.start_time).getTime();
+  const endMs = new Date(session.end_time).getTime();
+
+  if (nowMs < startMs) {
+    return {
+      phase: "upcoming",
+      primary: `Starts in ${formatCountdownAmount(startMs - nowMs)}`,
+      secondary: upcomingSecondary,
+    };
   }
-  if (remaining >= 60 * 60 * 1000) {
-    return `Opens in ${Math.ceil(remaining / (60 * 60 * 1000))}h`;
+
+  if (nowMs <= endMs) {
+    const elapsed = formatElapsedAmount(nowMs - startMs);
+    return {
+      phase: "in-progress",
+      primary: elapsed === "Just started" ? elapsed : `${elapsed} into session`,
+      secondary: `${formatCountdownAmount(endMs - nowMs)} remaining`,
+    };
   }
-  return `Opens in ${Math.max(1, Math.ceil(remaining / (60 * 1000)))}m`;
+
+  return {
+    phase: "ended",
+    primary: "Session over",
+    secondary: `Ended ${formatCountdownAmount(nowMs - endMs)} ago`,
+  };
 }
 
 function formatET(d: string) {
@@ -372,23 +420,27 @@ function CalendarView({
                           : status === "closed"
                             ? "Closed"
                             : `${session.spots_left} left`;
+                    const timeline = getSessionTimeline(session, nowMs, availabilityText);
 
                     return (
                       <button
                         type="button"
-                        className={`calendar-session-block status-${status}${checked ? " selected" : ""}`}
+                        className={`calendar-session-block status-${status} timeline-${timeline.phase}${checked ? " selected" : ""}`}
                         disabled={disabled}
                         onClick={() => onToggle(session.id)}
-                        title={`${session.label || "Ice session"} · ${formatET(session.start_time)} · ${availabilityText}`}
+                        title={`${session.label || "Ice session"} · ${formatET(session.start_time)} · ${timeline.primary}${timeline.secondary ? ` · ${timeline.secondary}` : ""}`}
                         aria-pressed={checked}
                         key={session.id}
                       >
                         <span className="calendar-check" aria-hidden="true">
-                          {checked ? "✓" : ""}
+                          {checked || timeline.phase === "ended" ? "✓" : ""}
                         </span>
                         <span className="calendar-session-copy">
                           <span className="calendar-session-time">{formatCalendarTime(session.start_time)}</span>
-                          <span className="calendar-session-status">{availabilityText}</span>
+                          <span className="calendar-session-status timeline-primary">{timeline.primary}</span>
+                          {timeline.secondary && (
+                            <span className="calendar-session-meta">{timeline.secondary}</span>
+                          )}
                         </span>
                       </button>
                     );
@@ -472,11 +524,6 @@ export default function Dashboard() {
 
   const upcomingCount = useMemo(
     () => sessions.filter((s) => new Date(s.end_time).getTime() > nowMs).length,
-    [sessions, nowMs]
-  );
-
-  const upcomingSessions = useMemo(
-    () => sessions.filter((s) => new Date(s.end_time).getTime() > nowMs),
     [sessions, nowMs]
   );
 
@@ -704,6 +751,9 @@ export default function Dashboard() {
                 <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>
                   {visibleSessions[0].spots_left} spot{visibleSessions[0].spots_left !== 1 ? "s" : ""} remaining
                 </div>
+                <div style={{ fontSize: 11, color: RED, fontWeight: 600, marginTop: 8 }}>
+                  {getSessionTimeline(visibleSessions[0], nowMs).primary}
+                </div>
               </>
             ) : (
               <div style={{ fontSize: 13, color: MUTED, marginTop: 12 }}>No upcoming sessions.</div>
@@ -757,7 +807,7 @@ export default function Dashboard() {
 
             {viewMode === "calendar" ? (
               <CalendarView
-                sessions={upcomingSessions}
+                sessions={sessions}
                 month={calendarMonth}
                 selected={selected}
                 nowMs={nowMs}
@@ -1125,6 +1175,19 @@ export default function Dashboard() {
           cursor: not-allowed;
           filter: saturate(.45);
         }
+        .calendar-session-block.timeline-in-progress {
+          border-color: var(--ice-mid);
+          background: var(--ice);
+          color: #2F6F7A;
+          box-shadow: inset 3px 0 0 var(--ice-mid);
+          filter: none;
+        }
+        .calendar-session-block.timeline-ended {
+          border-color: #D1CCC8;
+          background: #E4E0DC;
+          color: #69635F;
+          opacity: .78;
+        }
         .calendar-session-block.selected {
           border-color: ${RED};
           background: ${RED};
@@ -1146,6 +1209,7 @@ export default function Dashboard() {
           line-height: 1;
         }
         .calendar-session-copy {
+          width: 100%;
           min-width: 0;
           display: flex;
           flex-direction: column;
@@ -1162,8 +1226,17 @@ export default function Dashboard() {
         .calendar-session-status {
           margin-top: 1px;
           font-size: 8px;
+          font-weight: 700;
           line-height: 1.15;
           opacity: .88;
+          overflow: visible;
+          white-space: normal;
+        }
+        .calendar-session-meta {
+          margin-top: 2px;
+          font-size: 7px;
+          line-height: 1.15;
+          opacity: .74;
           overflow: visible;
           white-space: normal;
         }
@@ -1193,6 +1266,7 @@ export default function Dashboard() {
           .calendar-check { width: 9px; height: 9px; flex-basis: 9px; border-radius: 2px; }
           .calendar-session-time { font-size: 8px; }
           .calendar-session-status { font-size: 7px; }
+          .calendar-session-meta { font-size: 6.5px; }
         }
       `}</style>
     </div>
