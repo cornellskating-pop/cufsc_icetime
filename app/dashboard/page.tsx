@@ -748,70 +748,37 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      <div className="dashboard-hero-shell" style={{ padding: "44px 28px 0" }}>
+      <div className="dashboard-hero-shell" style={{ padding: "30px 28px 0" }}>
         <div
           className="dashboard-hero"
           style={{
             maxWidth: 1100,
             margin: "0 auto",
             display: "grid",
-            gridTemplateColumns: "1.1fr .9fr",
-            gap: 28,
-            alignItems: "end",
+            gridTemplateColumns: "450px minmax(0, 1fr)",
+            gap: 40,
+            alignItems: "center",
           }}
         >
           <div>
             <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: MUTED, marginBottom: 10 }}>
               Cornell University Figure Skating Club
             </div>
-            <div className="dashboard-title" style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: "clamp(30px,4vw,46px)", lineHeight: 1.04, letterSpacing: "-0.04em", color: INK, marginBottom: 12 }}>
+            <div className="dashboard-title" style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: "clamp(30px,3.5vw,42px)", lineHeight: 1.04, letterSpacing: "-0.04em", color: INK }}>
               Book your ice time <span style={{ color: RED }}>here.</span>
-            </div>
-            <ul className="booking-rules">
-              <li>One session per credit.</li>
-              <li>You can select and book up to two sessions at a time.</li>
-              <li>Charged credits are refunded when cancelled at least 30 minutes before start.</li>
-              <li>
-                During the final 60 minutes before start, a released session with space can be booked
-                without using a credit. Temporary accounts without credits require approval.
-              </li>
-              <li>Booking closes at the session start; cancellation closes 30 minutes after start.</li>
-            </ul>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {[
-                [String(credits), "Credits left"],
-                [profile?.tier ?? "—", "Member tier"],
-                [String(myBookings.length), "Active bookings"],
-              ].map(([n, l]) => (
-                <div key={l} style={{ minWidth: 118, padding: "12px 15px", border: `1px solid ${BORDER}`, borderRadius: 16, background: "rgba(255,255,255,.72)", boxShadow: "0 5px 14px rgba(47,39,38,.05)" }}>
-                  <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 19, fontWeight: 800, color: RED }}>{n}</div>
-                  <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>{l}</div>
-                </div>
-              ))}
             </div>
           </div>
 
-          <div style={{ padding: 22, borderRadius: 22, background: "rgba(255,255,255,.82)", border: `1px solid ${BORDER}`, boxShadow: "0 10px 28px rgba(46,36,35,.07)" }}>
-            <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: ".12em" }}>
-              Next open session
-            </div>
-            {visibleSessions[0] ? (
-              <>
-                <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 18, marginTop: 12 }}>
-                  {formatET(visibleSessions[0].start_time)}
-                </div>
-                <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>
-                  {visibleSessions[0].spots_left} spot{visibleSessions[0].spots_left !== 1 ? "s" : ""} remaining
-                </div>
-                <div style={{ fontSize: 11, color: RED, fontWeight: 600, marginTop: 8 }}>
-                  {getSessionTimeline(visibleSessions[0], nowMs).primary}
-                </div>
-              </>
-            ) : (
-              <div style={{ fontSize: 13, color: MUTED, marginTop: 12 }}>No upcoming sessions.</div>
-            )}
-            <div style={{ height: 5, borderRadius: 5, marginTop: 24, background: "linear-gradient(90deg, var(--red) 0 48%, var(--border) 48% 53%, var(--ice-mid) 53% 100%)" }} />
-          </div>
+          <ul className="booking-rules">
+            <li>One session per credit.</li>
+            <li>You can select and book up to two sessions at a time.</li>
+            <li>Charged credits are refunded when cancelled at least 30 minutes before start.</li>
+            <li>
+              During the final 60 minutes before start, a released session with space can be booked
+              without using a credit. Temporary accounts without credits require approval.
+            </li>
+            <li>Booking closes at the session start; cancellation closes 30 minutes after start.</li>
+          </ul>
         </div>
       </div>
 
@@ -1087,15 +1054,16 @@ export default function Dashboard() {
           gap: 12px;
         }
         .booking-rules {
-          max-width: 590px;
-          margin: 0 0 22px;
+          min-width: 0;
+          margin: 0;
           padding-left: 18px;
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          column-gap: 26px;
+          row-gap: 5px;
           color: ${MUTED};
-          font-size: 11.5px;
-          line-height: 1.4;
-        }
-        .booking-rules li + li {
-          margin-top: 3px;
+          font-size: 10.5px;
+          line-height: 1.35;
         }
         .booking-rules li::marker {
           color: ${RED};
@@ -1443,15 +1411,24 @@ export default function Dashboard() {
         @media (prefers-reduced-motion: reduce) {
           .show-session { animation: none !important; }
         }
+        @media (max-width: 900px) {
+          .dashboard-hero {
+            grid-template-columns: 1fr !important;
+            gap: 16px !important;
+          }
+        }
         @media (max-width: 680px) {
           .dashboard-grid {
             grid-template-columns: 1fr !important;
             padding: 18px 18px 80px !important;
           }
           .dashboard-hero-shell { padding: 30px 18px 0 !important; }
-          .dashboard-hero { grid-template-columns: 1fr !important; }
           .dashboard-title { white-space: normal; }
-          .booking-rules { font-size: 11px; margin-bottom: 20px; }
+          .booking-rules {
+            grid-template-columns: 1fr;
+            row-gap: 4px;
+            font-size: 10.5px;
+          }
           .dashboard-nav-email { display: none; }
           .dashboard-nav-actions { gap: 7px !important; }
           .dashboard-profile-spacer { display: none; }
