@@ -729,19 +729,6 @@ export default function Dashboard() {
             </a>
           )}
           <span className="dashboard-nav-email" style={{ fontSize: 12, color: MUTED }}>{profile?.email}</span>
-          <span
-            style={{
-              background: RED_LIGHT,
-              color: RED,
-              fontFamily: "'Syne',sans-serif",
-              fontWeight: 700,
-              fontSize: 11,
-              padding: "4px 12px",
-              borderRadius: 100,
-            }}
-          >
-            {credits} {credits === 1 ? "Credit" : "Credits"}
-          </span>
           <button className="btn-ghost" style={{ padding: "6px 12px", fontSize: 12 }} onClick={logout}>
             Sign out
           </button>
