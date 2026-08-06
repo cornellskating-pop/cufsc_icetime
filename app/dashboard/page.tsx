@@ -224,25 +224,39 @@ function getSessionStatus(
   return { status: "open", badgeLabel: "Open" };
 }
 
+function BookedSnowOverlay() {
+  return (
+    <span className="booked-snow-overlay" aria-hidden="true">
+      <span>❄</span>
+      <span>❅</span>
+      <span>❆</span>
+    </span>
+  );
+}
+
 function SessionRow({
   s,
   checked,
+  booked,
   disabled,
   onToggle,
   nowMs,
 }: {
   s: Session;
   checked: boolean;
+  booked: boolean;
   disabled: boolean;
   onToggle: () => void;
   nowMs: number;
 }) {
   const { status, badgeLabel, subtext } = getSessionStatus(s, new Date(nowMs));
+  const displayChecked = checked || booked;
   const isDisabled =
-    disabled || status === "ended" || status === "full" || status === "closed" || status === "soon";
+    booked || disabled || status === "ended" || status === "full" || status === "closed" || status === "soon";
 
   return (
     <div
+      className={`session-row${booked ? " booked" : ""}`}
       onClick={() => !isDisabled && onToggle()}
       style={{
         padding: "13px 20px",
@@ -251,7 +265,9 @@ function SessionRow({
         alignItems: "center",
         gap: 12,
         cursor: isDisabled ? "not-allowed" : "pointer",
-        background: checked ? RED_LIGHT : "white",
+        background: booked
+          ? "linear-gradient(135deg, rgba(237,246,248,.96), rgba(255,255,255,.96))"
+          : checked ? RED_LIGHT : "white",
         opacity: status === "ended" || status === "full" ? 0.45 : 1,
         transition: "background .15s",
       }}
@@ -260,17 +276,17 @@ function SessionRow({
         style={{
           width: 18,
           height: 18,
-          border: `1.5px solid ${checked ? RED : BORDER}`,
+          border: `1.5px solid ${displayChecked ? RED : BORDER}`,
           borderRadius: 5,
           flexShrink: 0,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: checked ? RED : "white",
+          background: displayChecked ? RED : "white",
           transition: "all .15s",
         }}
       >
-        {checked && (
+        {displayChecked && (
           <svg
             width="10"
             height="10"
@@ -306,7 +322,10 @@ function SessionRow({
         <SpotBar used={s.capacity - s.spots_left} cap={s.capacity} />
       </div>
 
-      <span className={`badge badge-${status}`}>{badgeLabel}</span>
+      <span className={`badge badge-${booked ? "active" : status}`}>
+        {booked ? "Booked" : badgeLabel}
+      </span>
+      {booked && <BookedSnowOverlay />}
     </div>
   );
 }
@@ -315,6 +334,7 @@ function CalendarView({
   sessions,
   month,
   selected,
+  bookedSessionIds,
   nowMs,
   onMonthChange,
   onToggle,
@@ -322,6 +342,7 @@ function CalendarView({
   sessions: Session[];
   month: CalendarMonth;
   selected: string[];
+  bookedSessionIds: ReadonlySet<string>;
   nowMs: number;
   onMonthChange: (offset: number) => void;
   onToggle: (id: string) => void;
@@ -405,11 +426,12 @@ function CalendarView({
                   {daySessions.map((session) => {
                     const { status } = getSessionStatus(session, new Date(nowMs));
                     const checked = selected.includes(session.id);
+                    const booked = bookedSessionIds.has(session.id);
                     const locked = status === "soon";
                     const unavailable =
                       status === "ended" || status === "full" || status === "closed";
                     const selectionBlocked = !checked && selected.length >= 2;
-                    const disabled = locked || unavailable || selectionBlocked;
+                    const disabled = booked || locked || unavailable || selectionBlocked;
                     const countdown = formatAvailabilityCountdown(session.release_at, nowMs);
                     const availabilityText = countdown
                       ? countdown
@@ -420,20 +442,24 @@ function CalendarView({
                           : status === "closed"
                             ? "Closed"
                             : `${session.spots_left} left`;
-                    const timeline = getSessionTimeline(session, nowMs, availabilityText);
+                    const timeline = getSessionTimeline(
+                      session,
+                      nowMs,
+                      booked ? "Booked" : availabilityText
+                    );
 
                     return (
                       <button
                         type="button"
-                        className={`calendar-session-block status-${status} timeline-${timeline.phase}${checked ? " selected" : ""}`}
+                        className={`calendar-session-block status-${status} timeline-${timeline.phase}${checked ? " selected" : ""}${booked ? " booked" : ""}`}
                         disabled={disabled}
                         onClick={() => onToggle(session.id)}
                         title={`${session.label || "Ice session"} · ${formatET(session.start_time)} · ${timeline.primary}${timeline.secondary ? ` · ${timeline.secondary}` : ""}`}
-                        aria-pressed={checked}
+                        aria-pressed={checked || booked}
                         key={session.id}
                       >
                         <span className="calendar-check" aria-hidden="true">
-                          {checked || timeline.phase === "ended" ? "✓" : ""}
+                          {checked || booked || timeline.phase === "ended" ? "✓" : ""}
                         </span>
                         <span className="calendar-session-copy">
                           <span className="calendar-session-time">{formatCalendarTime(session.start_time)}</span>
@@ -442,6 +468,7 @@ function CalendarView({
                             <span className="calendar-session-meta">{timeline.secondary}</span>
                           )}
                         </span>
+                        {booked && <BookedSnowOverlay />}
                       </button>
                     );
                   })}
@@ -525,6 +552,11 @@ export default function Dashboard() {
   const upcomingCount = useMemo(
     () => sessions.filter((s) => new Date(s.end_time).getTime() > nowMs).length,
     [sessions, nowMs]
+  );
+
+  const bookedSessionIds = useMemo(
+    () => new Set(myBookings.map((booking) => booking.session_id)),
+    [myBookings]
   );
 
   const toggle = (id: string) => {
@@ -810,6 +842,7 @@ export default function Dashboard() {
                 sessions={sessions}
                 month={calendarMonth}
                 selected={selected}
+                bookedSessionIds={bookedSessionIds}
                 nowMs={nowMs}
                 onMonthChange={(offset) => setCalendarMonth((current) => shiftCalendarMonth(current, offset))}
                 onToggle={toggle}
@@ -825,6 +858,7 @@ export default function Dashboard() {
                     key={s.id}
                     s={s}
                     checked={selected.includes(s.id)}
+                    booked={bookedSessionIds.has(s.id)}
                     disabled={!selected.includes(s.id) && selected.length >= 2}
                     onToggle={() => toggle(s.id)}
                     nowMs={nowMs}
@@ -1055,6 +1089,34 @@ export default function Dashboard() {
           color: ${RED};
           box-shadow: 0 2px 6px rgba(45,36,34,.09);
         }
+        .session-row {
+          position: relative;
+          overflow: hidden;
+        }
+        .session-row.booked {
+          box-shadow: inset 4px 0 0 var(--ice-mid);
+        }
+        .session-row > :not(.booked-snow-overlay),
+        .calendar-session-block > :not(.booked-snow-overlay) {
+          position: relative;
+          z-index: 1;
+        }
+        .booked-snow-overlay {
+          position: absolute;
+          inset: 0;
+          z-index: 0;
+          display: flex;
+          align-items: center;
+          justify-content: space-around;
+          color: var(--ice-mid);
+          opacity: .22;
+          overflow: hidden;
+          pointer-events: none;
+          transform: rotate(-7deg) scale(1.08);
+        }
+        .booked-snow-overlay span:nth-child(1) { font-size: 18px; transform: translateY(8px); }
+        .booked-snow-overlay span:nth-child(2) { font-size: 28px; transform: translateY(-6px); }
+        .booked-snow-overlay span:nth-child(3) { font-size: 21px; transform: translateY(7px); }
         .calendar-toolbar {
           min-height: 72px;
           padding: 14px 18px;
@@ -1142,6 +1204,8 @@ export default function Dashboard() {
           gap: 4px;
         }
         .calendar-session-block {
+          position: relative;
+          overflow: hidden;
           width: 100%;
           min-width: 0;
           border: 1px solid rgba(179,27,27,.26);
@@ -1193,6 +1257,23 @@ export default function Dashboard() {
           background: ${RED};
           color: white;
           filter: none;
+        }
+        .calendar-session-block.booked {
+          border-color: var(--ice-mid);
+          background: linear-gradient(135deg, var(--ice), #FFFFFF);
+          color: #2F6F7A;
+          box-shadow: inset 3px 0 0 var(--ice-mid);
+          cursor: not-allowed;
+          filter: none;
+          opacity: 1;
+        }
+        .calendar-session-block.booked.timeline-ended {
+          filter: saturate(.55);
+          opacity: .72;
+        }
+        .calendar-session-block .booked-snow-overlay {
+          opacity: .3;
+          transform: rotate(-9deg) scale(1.2);
         }
         .calendar-check {
           width: 11px;
