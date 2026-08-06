@@ -234,6 +234,10 @@ function BookedSnowOverlay() {
   );
 }
 
+function isShowSession(session: Session) {
+  return session.label?.toLowerCase().includes("show") ?? false;
+}
+
 function SessionRow({
   s,
   checked,
@@ -250,13 +254,14 @@ function SessionRow({
   nowMs: number;
 }) {
   const { status, badgeLabel, subtext } = getSessionStatus(s, new Date(nowMs));
+  const showSession = isShowSession(s);
   const displayChecked = checked || booked;
   const isDisabled =
     booked || disabled || status === "ended" || status === "full" || status === "closed" || status === "soon";
 
   return (
     <div
-      className={`session-row${booked ? " booked" : ""}`}
+      className={`session-row${booked ? " booked" : ""}${showSession ? " show-session" : ""}`}
       onClick={() => !isDisabled && onToggle()}
       style={{
         padding: "13px 20px",
@@ -265,7 +270,9 @@ function SessionRow({
         alignItems: "center",
         gap: 12,
         cursor: isDisabled ? "not-allowed" : "pointer",
-        background: booked
+        background: showSession
+          ? "linear-gradient(135deg, rgba(240,252,255,.98), rgba(249,244,255,.98))"
+          : booked
           ? "linear-gradient(135deg, rgba(237,246,248,.96), rgba(255,255,255,.96))"
           : checked ? RED_LIGHT : "white",
         opacity: status === "ended" || status === "full" ? 0.45 : 1,
@@ -322,8 +329,11 @@ function SessionRow({
         <SpotBar used={s.capacity - s.spots_left} cap={s.capacity} />
       </div>
 
-      <span className={`badge badge-${booked ? "active" : status}`}>
-        {booked ? "Booked" : badgeLabel}
+      <span className="session-badges">
+        {showSession && <span className="badge badge-show">Show</span>}
+        <span className={`badge badge-${booked ? "active" : status}`}>
+          {booked ? "Booked" : badgeLabel}
+        </span>
       </span>
       {booked && <BookedSnowOverlay />}
     </div>
@@ -427,6 +437,7 @@ function CalendarView({
                     const { status } = getSessionStatus(session, new Date(nowMs));
                     const checked = selected.includes(session.id);
                     const booked = bookedSessionIds.has(session.id);
+                    const showSession = isShowSession(session);
                     const locked = status === "soon";
                     const unavailable =
                       status === "ended" || status === "full" || status === "closed";
@@ -451,7 +462,7 @@ function CalendarView({
                     return (
                       <button
                         type="button"
-                        className={`calendar-session-block status-${status} timeline-${timeline.phase}${checked ? " selected" : ""}${booked ? " booked" : ""}`}
+                        className={`calendar-session-block status-${status} timeline-${timeline.phase}${checked ? " selected" : ""}${booked ? " booked" : ""}${showSession ? " show-session" : ""}`}
                         disabled={disabled}
                         onClick={() => onToggle(session.id)}
                         title={`${session.label || "Ice session"} · ${formatET(session.start_time)} · ${timeline.primary}${timeline.secondary ? ` · ${timeline.secondary}` : ""}`}
@@ -462,7 +473,10 @@ function CalendarView({
                           {checked || booked || timeline.phase === "ended" ? "✓" : ""}
                         </span>
                         <span className="calendar-session-copy">
-                          <span className="calendar-session-time">{formatCalendarTime(session.start_time)}</span>
+                          <span className="calendar-session-time">
+                            {showSession && <span className="calendar-show-label">Show</span>}
+                            {formatCalendarTime(session.start_time)}
+                          </span>
                           <span className="calendar-session-status timeline-primary">{timeline.primary}</span>
                           {timeline.secondary && (
                             <span className="calendar-session-meta">{timeline.secondary}</span>
@@ -1118,6 +1132,30 @@ export default function Dashboard() {
         .session-row.booked {
           box-shadow: inset 4px 0 0 var(--ice-mid);
         }
+        .session-row.show-session {
+          outline: 1.5px solid transparent;
+          outline-offset: -2px;
+          box-shadow:
+            inset 4px 0 0 #67C9DA,
+            inset -2px 0 0 #A58BE8,
+            0 0 10px rgba(126, 143, 229, .2);
+          animation: showRowGlow 2.8s ease-in-out infinite;
+        }
+        .session-badges {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          gap: 5px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+        .badge-show {
+          border: 1px solid rgba(126, 106, 218, .34);
+          background: linear-gradient(120deg, #DDF7FB, #E8E1FF, #F3DDF8);
+          color: #6250A4;
+          box-shadow: 0 0 8px rgba(126, 143, 229, .2);
+        }
         .session-row > :not(.booked-snow-overlay),
         .calendar-session-block > :not(.booked-snow-overlay) {
           position: relative;
@@ -1293,6 +1331,40 @@ export default function Dashboard() {
           filter: saturate(.55);
           opacity: .72;
         }
+        .calendar-session-block.show-session {
+          border: 1.5px solid transparent;
+          background:
+            linear-gradient(135deg, rgba(241,252,254,.98), rgba(250,245,255,.98)) padding-box,
+            linear-gradient(120deg, #64CBDB, #8588E8, #C287E4, #64CBDB) border-box;
+          background-size: 100% 100%, 200% 200%;
+          color: #6250A4;
+          box-shadow:
+            0 0 0 1px rgba(104, 202, 219, .14),
+            0 0 10px rgba(135, 121, 226, .3);
+          filter: none;
+          opacity: 1;
+          animation: showSessionGlow 2.8s ease-in-out infinite;
+        }
+        .calendar-session-block.show-session.selected {
+          background:
+            linear-gradient(135deg, #617FC7, #8567C7) padding-box,
+            linear-gradient(120deg, #7CE1EA, #BBA2FF, #F0A9EC, #7CE1EA) border-box;
+          color: white;
+        }
+        .calendar-show-label {
+          margin-right: 3px;
+          border-radius: 3px;
+          padding: 1px 3px;
+          display: inline-flex;
+          background: linear-gradient(120deg, #CFF4F8, #E5D9FF);
+          color: #6250A4;
+          font-size: 6px;
+          font-weight: 800;
+          letter-spacing: .04em;
+          line-height: 1.2;
+          text-transform: uppercase;
+          vertical-align: 1px;
+        }
         .calendar-session-block .booked-snow-overlay {
           opacity: .3;
           transform: rotate(-9deg) scale(1.2);
@@ -1342,6 +1414,33 @@ export default function Dashboard() {
           opacity: .74;
           overflow: visible;
           white-space: normal;
+        }
+        @keyframes showSessionGlow {
+          0%, 100% {
+            background-position: 0 0, 0% 50%;
+            box-shadow: 0 0 7px rgba(101, 202, 219, .2), 0 0 11px rgba(132, 118, 225, .18);
+          }
+          50% {
+            background-position: 0 0, 100% 50%;
+            box-shadow: 0 0 10px rgba(101, 202, 219, .34), 0 0 17px rgba(174, 112, 220, .3);
+          }
+        }
+        @keyframes showRowGlow {
+          0%, 100% {
+            box-shadow:
+              inset 4px 0 0 #67C9DA,
+              inset -2px 0 0 #A58BE8,
+              0 0 8px rgba(126, 143, 229, .18);
+          }
+          50% {
+            box-shadow:
+              inset 4px 0 0 #67C9DA,
+              inset -2px 0 0 #A58BE8,
+              0 0 15px rgba(153, 112, 222, .3);
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .show-session { animation: none !important; }
         }
         @media (max-width: 680px) {
           .dashboard-grid {
