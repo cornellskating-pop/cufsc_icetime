@@ -565,7 +565,9 @@ export default function Dashboard() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-          <div className="card" style={{ padding: 18 }}>
+          <div>
+            <div className="section-label dashboard-profile-spacer" aria-hidden="true">&nbsp;</div>
+            <div className="card" style={{ padding: 18 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
               <div
                 style={{
@@ -641,15 +643,16 @@ export default function Dashboard() {
               <span>Credits remaining</span>
               <strong style={{ color: INK }}>{credits}</strong>
             </div>
-            <div style={{ height: 6, background: BORDER, borderRadius: 100, overflow: "hidden" }}>
-              <div
-                style={{
-                  width: `${Math.min(100, credits * 20)}%`,
-                  height: "100%",
-                  background: `linear-gradient(90deg, var(--red-dark), ${RED})`,
-                  borderRadius: 100,
-                }}
-              />
+              <div style={{ height: 6, background: BORDER, borderRadius: 100, overflow: "hidden" }}>
+                <div
+                  style={{
+                    width: `${Math.min(100, credits * 20)}%`,
+                    height: "100%",
+                    background: `linear-gradient(90deg, var(--red-dark), ${RED})`,
+                    borderRadius: 100,
+                  }}
+                />
+              </div>
             </div>
           </div>
 
@@ -719,6 +722,7 @@ export default function Dashboard() {
           .dashboard-hero { grid-template-columns: 1fr !important; }
           .dashboard-nav-email { display: none; }
           .dashboard-nav-actions { gap: 7px !important; }
+          .dashboard-profile-spacer { display: none; }
         }
       `}</style>
     </div>
