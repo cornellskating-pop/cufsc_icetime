@@ -36,6 +36,11 @@ type BookingResult = {
   session_id?: string;
 };
 
+type CalendarMonth = {
+  year: number;
+  month: number;
+};
+
 const RED = "var(--red)";
 const BORDER = "var(--border)";
 const MUTED = "var(--muted)";
@@ -44,6 +49,71 @@ const INK = "var(--ink)";
 const RED_LIGHT = "var(--red-light)";
 const SUCCESS_BG = "var(--success-bg)";
 const SUCCESS = "var(--success)";
+const ET_TIME_ZONE = "America/New_York";
+
+const etDatePartsFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: ET_TIME_ZONE,
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+});
+
+function getETDateParts(date: Date) {
+  const parts = etDatePartsFormatter.formatToParts(date);
+  const read = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value);
+
+  return {
+    year: read("year"),
+    month: read("month"),
+    day: read("day"),
+  };
+}
+
+function getCurrentETMonth(): CalendarMonth {
+  const { year, month } = getETDateParts(new Date());
+  return { year, month };
+}
+
+function getETDateKey(date: Date | string) {
+  const { year, month, day } = getETDateParts(typeof date === "string" ? new Date(date) : date);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function shiftCalendarMonth(value: CalendarMonth, offset: number): CalendarMonth {
+  const shifted = new Date(Date.UTC(value.year, value.month - 1 + offset, 1));
+  return { year: shifted.getUTCFullYear(), month: shifted.getUTCMonth() + 1 };
+}
+
+function formatCalendarMonth(value: CalendarMonth) {
+  return new Date(Date.UTC(value.year, value.month - 1, 1)).toLocaleString("en-US", {
+    timeZone: "UTC",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function formatCalendarTime(value: string) {
+  return new Date(value).toLocaleString("en-US", {
+    timeZone: ET_TIME_ZONE,
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function formatAvailabilityCountdown(releaseAt: string | null, nowMs: number) {
+  if (!releaseAt) return null;
+
+  const remaining = new Date(releaseAt).getTime() - nowMs;
+  if (remaining <= 0) return null;
+  if (remaining >= 48 * 60 * 60 * 1000) {
+    return `Opens in ${Math.ceil(remaining / (24 * 60 * 60 * 1000))}d`;
+  }
+  if (remaining >= 60 * 60 * 1000) {
+    return `Opens in ${Math.ceil(remaining / (60 * 60 * 1000))}h`;
+  }
+  return `Opens in ${Math.max(1, Math.ceil(remaining / (60 * 1000)))}m`;
+}
 
 function formatET(d: string) {
   return new Date(d).toLocaleString("en-US", {
@@ -74,8 +144,10 @@ function canCancelBooking(startTime: string) {
 
 type SessionStatus = "open" | "grace" | "soon" | "full" | "closed" | "ended";
 
-function getSessionStatus(s: Session): { status: SessionStatus; badgeLabel: string; subtext?: string } {
-  const now = new Date();
+function getSessionStatus(
+  s: Session,
+  now = new Date()
+): { status: SessionStatus; badgeLabel: string; subtext?: string } {
   const start = new Date(s.start_time);
   const end = new Date(s.end_time);
   const release = s.release_at ? new Date(s.release_at) : null;
@@ -83,10 +155,9 @@ function getSessionStatus(s: Session): { status: SessionStatus; badgeLabel: stri
   if (now > end) return { status: "ended", badgeLabel: "Ended" };
 
   if (release && now < release) {
-    const mins = Math.max(0, Math.ceil((release.getTime() - now.getTime()) / 60000));
     return {
       status: "soon",
-      badgeLabel: mins < 60 ? `Opens in ${mins}m` : `Opens in ${Math.ceil(mins / 60)}h`,
+      badgeLabel: formatAvailabilityCountdown(s.release_at, now.getTime()) ?? "Opening soon",
     };
   }
 
@@ -110,13 +181,15 @@ function SessionRow({
   checked,
   disabled,
   onToggle,
+  nowMs,
 }: {
   s: Session;
   checked: boolean;
   disabled: boolean;
   onToggle: () => void;
+  nowMs: number;
 }) {
-  const { status, badgeLabel, subtext } = getSessionStatus(s);
+  const { status, badgeLabel, subtext } = getSessionStatus(s, new Date(nowMs));
   const isDisabled =
     disabled || status === "ended" || status === "full" || status === "closed" || status === "soon";
 
@@ -190,6 +263,146 @@ function SessionRow({
   );
 }
 
+function CalendarView({
+  sessions,
+  month,
+  selected,
+  nowMs,
+  onMonthChange,
+  onToggle,
+}: {
+  sessions: Session[];
+  month: CalendarMonth;
+  selected: string[];
+  nowMs: number;
+  onMonthChange: (offset: number) => void;
+  onToggle: (id: string) => void;
+}) {
+  const sessionsByDay = useMemo(() => {
+    const grouped = new Map<string, Session[]>();
+    sessions.forEach((session) => {
+      const key = getETDateKey(session.start_time);
+      grouped.set(key, [...(grouped.get(key) ?? []), session]);
+    });
+    return grouped;
+  }, [sessions]);
+
+  const days = useMemo(() => {
+    const firstWeekday = new Date(Date.UTC(month.year, month.month - 1, 1)).getUTCDay();
+    const daysInMonth = new Date(Date.UTC(month.year, month.month, 0)).getUTCDate();
+    const cellCount = Math.ceil((firstWeekday + daysInMonth) / 7) * 7;
+
+    return Array.from({ length: cellCount }, (_, index) => {
+      const date = new Date(Date.UTC(month.year, month.month - 1, index - firstWeekday + 1));
+      const year = date.getUTCFullYear();
+      const calendarMonth = date.getUTCMonth() + 1;
+      const day = date.getUTCDate();
+
+      return {
+        year,
+        month: calendarMonth,
+        day,
+        key: `${year}-${String(calendarMonth).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+        isCurrentMonth: calendarMonth === month.month && year === month.year,
+      };
+    });
+  }, [month]);
+
+  const todayKey = getETDateKey(new Date(nowMs));
+
+  return (
+    <>
+      <div className="calendar-toolbar">
+        <button
+          type="button"
+          className="calendar-nav-button"
+          aria-label="Previous month"
+          onClick={() => onMonthChange(-1)}
+        >
+          ←
+        </button>
+        <div>
+          <div className="calendar-month-title">{formatCalendarMonth(month)}</div>
+          <div className="calendar-timezone">Times shown in ET</div>
+        </div>
+        <button
+          type="button"
+          className="calendar-nav-button"
+          aria-label="Next month"
+          onClick={() => onMonthChange(1)}
+        >
+          →
+        </button>
+      </div>
+
+      <div className="calendar-scroll">
+        <div className="calendar-grid" role="grid" aria-label={`${formatCalendarMonth(month)} sessions`}>
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((weekday) => (
+            <div className="calendar-weekday" role="columnheader" key={weekday}>
+              {weekday}
+            </div>
+          ))}
+
+          {days.map((day) => {
+            const daySessions = sessionsByDay.get(day.key) ?? [];
+
+            return (
+              <div
+                className={`calendar-day${day.isCurrentMonth ? "" : " outside"}${day.key === todayKey ? " today" : ""}`}
+                role="gridcell"
+                key={day.key}
+              >
+                <div className="calendar-day-number">{day.day}</div>
+                <div className="calendar-day-sessions">
+                  {daySessions.map((session) => {
+                    const { status } = getSessionStatus(session, new Date(nowMs));
+                    const checked = selected.includes(session.id);
+                    const locked = status === "soon";
+                    const unavailable =
+                      status === "ended" || status === "full" || status === "closed";
+                    const selectionBlocked = !checked && selected.length >= 2;
+                    const disabled = locked || unavailable || selectionBlocked;
+                    const countdown = formatAvailabilityCountdown(session.release_at, nowMs);
+                    const availabilityText = countdown
+                      ? countdown
+                      : status === "full"
+                        ? "Full"
+                        : status === "ended"
+                          ? "Ended"
+                          : status === "closed"
+                            ? "Closed"
+                            : `${session.spots_left} left`;
+
+                    return (
+                      <button
+                        type="button"
+                        className={`calendar-session-block status-${status}${checked ? " selected" : ""}`}
+                        disabled={disabled}
+                        onClick={() => onToggle(session.id)}
+                        title={`${session.label || "Ice session"} · ${formatET(session.start_time)} · ${availabilityText}`}
+                        aria-pressed={checked}
+                        key={session.id}
+                      >
+                        <span className="calendar-check" aria-hidden="true">
+                          {checked ? "✓" : ""}
+                        </span>
+                        <span className="calendar-session-copy">
+                          <span className="calendar-session-time">{formatCalendarTime(session.start_time)}</span>
+                          <span className="calendar-session-status">{availabilityText}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function Dashboard() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -200,6 +413,9 @@ export default function Dashboard() {
   const [booking, setBooking] = useState(false);
   const [msg, setMsg] = useState("");
   const [msgType, setMsgType] = useState<"success" | "error" | "info">("info");
+  const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
+  const [calendarMonth, setCalendarMonth] = useState<CalendarMonth>(getCurrentETMonth);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const refreshData = async (userId: string) => {
     const [{ data: sData }, { data: bData }, { data: uData }] = await Promise.all([
@@ -223,6 +439,11 @@ export default function Dashboard() {
     });
   }, []);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 30 * 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const [accessStatus, setAccessStatus] = useState<"idle"|"pending"|"requested"|"error">("idle");
   const [accessError, setAccessError] = useState("");
 
@@ -244,14 +465,19 @@ export default function Dashboard() {
   const maxSelect = Math.min(2, Math.max(0, credits));
 
   const visibleSessions = useMemo(() => {
-    const now = new Date();
+    const now = new Date(nowMs);
     const upcoming = sessions.filter((s) => new Date(s.end_time) > now);
     return showAll ? upcoming : upcoming.slice(0, 5);
-  }, [sessions, showAll]);
+  }, [sessions, showAll, nowMs]);
 
   const upcomingCount = useMemo(
-    () => sessions.filter((s) => new Date(s.end_time) > new Date()).length,
-    [sessions]
+    () => sessions.filter((s) => new Date(s.end_time).getTime() > nowMs).length,
+    [sessions, nowMs]
+  );
+
+  const upcomingSessions = useMemo(
+    () => sessions.filter((s) => new Date(s.end_time).getTime() > nowMs),
+    [sessions, nowMs]
   );
 
   const toggle = (id: string) => {
@@ -502,45 +728,79 @@ export default function Dashboard() {
         <div>
           <div className="section-label">Available Sessions</div>
           <div className="card">
-            <div className="card-header">
+            <div className="card-header session-card-header">
               <span style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 14 }}>
-                This Week
+                {viewMode === "calendar" ? "Monthly Calendar" : "Session List"}
               </span>
-              <span style={{ fontSize: 12, color: MUTED }}>Select up to 2</span>
+              <div className="session-view-actions">
+                <span className="session-select-hint" style={{ fontSize: 12, color: MUTED }}>Select up to 2</span>
+                <div className="session-view-toggle" aria-label="Session view">
+                  <button
+                    type="button"
+                    className={viewMode === "calendar" ? "active" : ""}
+                    aria-pressed={viewMode === "calendar"}
+                    onClick={() => setViewMode("calendar")}
+                  >
+                    Calendar
+                  </button>
+                  <button
+                    type="button"
+                    className={viewMode === "list" ? "active" : ""}
+                    aria-pressed={viewMode === "list"}
+                    onClick={() => setViewMode("list")}
+                  >
+                    List
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {visibleSessions.length === 0 && (
-              <div style={{ padding: "24px 20px", color: MUTED, fontSize: 13 }}>No upcoming sessions.</div>
-            )}
-
-            {visibleSessions.map((s) => (
-              <SessionRow
-                key={s.id}
-                s={s}
-                checked={selected.includes(s.id)}
-                disabled={!selected.includes(s.id) && selected.length >= 2}
-                onToggle={() => toggle(s.id)}
+            {viewMode === "calendar" ? (
+              <CalendarView
+                sessions={upcomingSessions}
+                month={calendarMonth}
+                selected={selected}
+                nowMs={nowMs}
+                onMonthChange={(offset) => setCalendarMonth((current) => shiftCalendarMonth(current, offset))}
+                onToggle={toggle}
               />
-            ))}
+            ) : (
+              <>
+                {visibleSessions.length === 0 && (
+                  <div style={{ padding: "24px 20px", color: MUTED, fontSize: 13 }}>No upcoming sessions.</div>
+                )}
 
-            {upcomingCount > 5 && (
-              <div style={{ display: "flex", borderTop: `1px solid ${BORDER}` }}>
-                <button
-                  onClick={() => setShowAll((v) => !v)}
-                  style={{
-                    flex: 1,
-                    padding: 11,
-                    background: "none",
-                    border: "none",
-                    color: RED,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  {showAll ? "Show less ↑" : `Show ${upcomingCount - 5} more ↓`}
-                </button>
-              </div>
+                {visibleSessions.map((s) => (
+                  <SessionRow
+                    key={s.id}
+                    s={s}
+                    checked={selected.includes(s.id)}
+                    disabled={!selected.includes(s.id) && selected.length >= 2}
+                    onToggle={() => toggle(s.id)}
+                    nowMs={nowMs}
+                  />
+                ))}
+
+                {upcomingCount > 5 && (
+                  <div style={{ display: "flex", borderTop: `1px solid ${BORDER}` }}>
+                    <button
+                      onClick={() => setShowAll((v) => !v)}
+                      style={{
+                        flex: 1,
+                        padding: 11,
+                        background: "none",
+                        border: "none",
+                        color: RED,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {showAll ? "Show less ↑" : `Show ${upcomingCount - 5} more ↓`}
+                    </button>
+                  </div>
+                )}
+              </>
             )}
 
             <div style={{ padding: "14px 20px", background: CREAM, borderTop: `1px solid ${BORDER}` }}>
@@ -717,12 +977,220 @@ export default function Dashboard() {
       </div>
 
       <style>{`
+        .session-view-actions {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .session-view-toggle {
+          display: flex;
+          padding: 3px;
+          border: 1px solid ${BORDER};
+          border-radius: 10px;
+          background: ${CREAM};
+        }
+        .session-view-toggle button {
+          border: 0;
+          border-radius: 7px;
+          padding: 6px 9px;
+          background: transparent;
+          color: ${MUTED};
+          font-family: 'DM Sans', sans-serif;
+          font-size: 11px;
+          font-weight: 600;
+          cursor: pointer;
+        }
+        .session-view-toggle button.active {
+          background: white;
+          color: ${RED};
+          box-shadow: 0 2px 6px rgba(45,36,34,.09);
+        }
+        .calendar-toolbar {
+          min-height: 72px;
+          padding: 14px 18px;
+          border-bottom: 1px solid ${BORDER};
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          text-align: center;
+          background: rgba(247,244,240,.58);
+        }
+        .calendar-month-title {
+          font-family: 'Syne', sans-serif;
+          font-size: 17px;
+          font-weight: 800;
+          color: ${INK};
+        }
+        .calendar-timezone {
+          margin-top: 2px;
+          color: ${MUTED};
+          font-size: 10px;
+        }
+        .calendar-nav-button {
+          width: 34px;
+          height: 34px;
+          border: 1px solid ${BORDER};
+          border-radius: 10px;
+          background: white;
+          color: ${INK};
+          font-size: 16px;
+          cursor: pointer;
+        }
+        .calendar-nav-button:hover {
+          border-color: ${RED};
+          color: ${RED};
+        }
+        .calendar-scroll {
+          width: 100%;
+          overflow: hidden;
+        }
+        .calendar-grid {
+          display: grid;
+          grid-template-columns: repeat(7, minmax(0, 1fr));
+          background: ${BORDER};
+          gap: 1px;
+        }
+        .calendar-weekday {
+          padding: 8px 3px;
+          background: ${CREAM};
+          color: ${MUTED};
+          font-size: 9px;
+          font-weight: 700;
+          letter-spacing: .07em;
+          text-align: center;
+          text-transform: uppercase;
+        }
+        .calendar-day {
+          min-width: 0;
+          min-height: 92px;
+          padding: 7px 5px;
+          background: rgba(255,255,255,.96);
+        }
+        .calendar-day.outside {
+          background: rgba(247,244,240,.72);
+        }
+        .calendar-day.outside .calendar-day-number {
+          opacity: .34;
+        }
+        .calendar-day.today {
+          box-shadow: inset 0 0 0 2px rgba(179,27,27,.24);
+        }
+        .calendar-day-number {
+          margin: 0 2px 6px;
+          color: ${MUTED};
+          font-size: 10px;
+          font-weight: 600;
+        }
+        .calendar-day.today .calendar-day-number {
+          color: ${RED};
+          font-weight: 800;
+        }
+        .calendar-day-sessions {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+        .calendar-session-block {
+          width: 100%;
+          min-width: 0;
+          border: 1px solid rgba(179,27,27,.26);
+          border-radius: 7px;
+          padding: 5px;
+          display: flex;
+          align-items: flex-start;
+          gap: 4px;
+          background: ${RED_LIGHT};
+          color: ${RED};
+          font-family: 'DM Sans', sans-serif;
+          text-align: left;
+          cursor: pointer;
+          transition: background .15s, border-color .15s, color .15s;
+        }
+        .calendar-session-block:hover:not(:disabled) {
+          border-color: ${RED};
+        }
+        .calendar-session-block.status-grace {
+          border-color: #E5C85B;
+          background: #FEF9C3;
+          color: #854D0E;
+        }
+        .calendar-session-block.status-soon,
+        .calendar-session-block.status-full,
+        .calendar-session-block.status-closed,
+        .calendar-session-block.status-ended {
+          border-color: #D5D0CC;
+          background: #EAE7E3;
+          color: #77706C;
+          cursor: not-allowed;
+          filter: saturate(.45);
+        }
+        .calendar-session-block.selected {
+          border-color: ${RED};
+          background: ${RED};
+          color: white;
+          filter: none;
+        }
+        .calendar-check {
+          width: 11px;
+          height: 11px;
+          margin-top: 1px;
+          border: 1.25px solid currentColor;
+          border-radius: 3px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex: 0 0 11px;
+          font-size: 8px;
+          font-weight: 800;
+          line-height: 1;
+        }
+        .calendar-session-copy {
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+        }
+        .calendar-session-time,
+        .calendar-session-status {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .calendar-session-time {
+          font-size: 9px;
+          font-weight: 700;
+        }
+        .calendar-session-status {
+          margin-top: 1px;
+          font-size: 8px;
+          opacity: .88;
+        }
         @media (max-width: 680px) {
           .dashboard-grid { grid-template-columns: 1fr !important; }
           .dashboard-hero { grid-template-columns: 1fr !important; }
           .dashboard-nav-email { display: none; }
           .dashboard-nav-actions { gap: 7px !important; }
           .dashboard-profile-spacer { display: none; }
+          .session-card-header {
+            align-items: flex-start !important;
+            gap: 10px;
+          }
+          .session-view-actions {
+            align-items: flex-end;
+            flex-direction: column;
+            gap: 6px;
+          }
+          .session-select-hint { display: none; }
+          .calendar-toolbar { min-height: 64px; padding: 11px 12px; }
+          .calendar-month-title { font-size: 15px; }
+          .calendar-nav-button { width: 32px; height: 32px; }
+          .calendar-weekday { padding: 7px 1px; font-size: 8px; letter-spacing: 0; }
+          .calendar-day { min-height: 76px; padding: 5px 3px; }
+          .calendar-day-number { margin: 0 1px 4px; font-size: 9px; }
+          .calendar-session-block { padding: 4px 3px; gap: 3px; }
+          .calendar-check { width: 9px; height: 9px; flex-basis: 9px; border-radius: 2px; }
+          .calendar-session-time { font-size: 8px; }
+          .calendar-session-status { font-size: 7px; }
         }
       `}</style>
     </div>
