@@ -701,16 +701,16 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      <div style={{ padding: "44px 28px 26px" }}>
+      <div className="dashboard-hero-shell" style={{ padding: "44px 28px 0" }}>
         <div
           className="dashboard-hero"
           style={{
             maxWidth: 1100,
             margin: "0 auto",
             display: "grid",
-            gridTemplateColumns: "1.25fr .75fr",
-            gap: 24,
-            alignItems: "center",
+            gridTemplateColumns: "1.1fr .9fr",
+            gap: 28,
+            alignItems: "end",
           }}
         >
           <div>
@@ -768,7 +768,7 @@ export default function Dashboard() {
         style={{
           maxWidth: 1100,
           margin: "0 auto",
-          padding: "28px 24px 80px",
+          padding: "18px 0 80px",
           display: "grid",
           gridTemplateColumns: "minmax(0, 1fr) 300px",
           gap: 24,
@@ -1241,7 +1241,11 @@ export default function Dashboard() {
           white-space: normal;
         }
         @media (max-width: 680px) {
-          .dashboard-grid { grid-template-columns: 1fr !important; }
+          .dashboard-grid {
+            grid-template-columns: 1fr !important;
+            padding: 18px 18px 80px !important;
+          }
+          .dashboard-hero-shell { padding: 30px 18px 0 !important; }
           .dashboard-hero { grid-template-columns: 1fr !important; }
           .dashboard-nav-email { display: none; }
           .dashboard-nav-actions { gap: 7px !important; }
