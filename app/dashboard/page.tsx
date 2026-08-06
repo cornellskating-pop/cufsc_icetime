@@ -749,10 +749,8 @@ export default function Dashboard() {
             <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: MUTED, marginBottom: 10 }}>
               Cornell University Figure Skating Club
             </div>
-            <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: "clamp(30px,4vw,46px)", lineHeight: 1.04, letterSpacing: "-0.04em", color: INK, marginBottom: 12 }}>
-              Book your ice time
-              <br />
-              <span style={{ color: RED }}>here.</span>
+            <div className="dashboard-title" style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: "clamp(30px,4vw,46px)", lineHeight: 1.04, letterSpacing: "-0.04em", color: INK, marginBottom: 12 }}>
+              Book your ice time <span style={{ color: RED }}>here.</span>
             </div>
             <ul className="booking-rules">
               <li>One session per credit.</li>
@@ -1087,6 +1085,9 @@ export default function Dashboard() {
         .booking-rules li::marker {
           color: ${RED};
         }
+        .dashboard-title {
+          white-space: nowrap;
+        }
         .session-view-toggle {
           display: flex;
           padding: 3px;
@@ -1349,6 +1350,7 @@ export default function Dashboard() {
           }
           .dashboard-hero-shell { padding: 30px 18px 0 !important; }
           .dashboard-hero { grid-template-columns: 1fr !important; }
+          .dashboard-title { white-space: normal; }
           .booking-rules { font-size: 11px; margin-bottom: 20px; }
           .dashboard-nav-email { display: none; }
           .dashboard-nav-actions { gap: 7px !important; }
