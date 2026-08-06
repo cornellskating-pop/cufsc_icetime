@@ -757,7 +757,7 @@ export default function Dashboard() {
             display: "grid",
             gridTemplateColumns: "450px minmax(0, 1fr)",
             gap: 40,
-            alignItems: "center",
+            alignItems: "start",
           }}
         >
           <div>
@@ -1057,10 +1057,9 @@ export default function Dashboard() {
           min-width: 0;
           margin: 0;
           padding-left: 18px;
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          column-gap: 26px;
-          row-gap: 5px;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
           color: ${MUTED};
           font-size: 10.5px;
           line-height: 1.35;
@@ -1425,8 +1424,7 @@ export default function Dashboard() {
           .dashboard-hero-shell { padding: 30px 18px 0 !important; }
           .dashboard-title { white-space: normal; }
           .booking-rules {
-            grid-template-columns: 1fr;
-            row-gap: 4px;
+            gap: 5px;
             font-size: 10.5px;
           }
           .dashboard-nav-email { display: none; }
