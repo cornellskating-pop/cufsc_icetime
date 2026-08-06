@@ -956,7 +956,7 @@ export default function Dashboard() {
               <div style={{ height: 6, background: BORDER, borderRadius: 100, overflow: "hidden" }}>
                 <div
                   style={{
-                    width: `${Math.min(100, credits * 20)}%`,
+                    width: `${Math.min(100, Math.max(0, (credits / 2) * 100))}%`,
                     height: "100%",
                     background: `linear-gradient(90deg, var(--red-dark), ${RED})`,
                     borderRadius: 100,
