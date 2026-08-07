@@ -754,6 +754,14 @@ export default function Dashboard() {
             <div className="dashboard-title" style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: "clamp(30px,3.5vw,42px)", lineHeight: 1.04, letterSpacing: "-0.04em", color: INK }}>
               Book your ice time <span style={{ color: RED }}>here.</span>
             </div>
+            <a
+              className="venmo-credit-link"
+              href="https://venmo.com/u/CUFSC"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Venmo: @CUFSC <span>$15 per credit</span>
+            </a>
           </div>
 
           <ul className="booking-rules">
@@ -1056,6 +1064,31 @@ export default function Dashboard() {
         }
         .dashboard-title {
           white-space: nowrap;
+        }
+        .venmo-credit-link {
+          width: fit-content;
+          margin-top: 10px;
+          padding: 5px 10px;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          border: 1px solid rgba(207, 47, 47, .22);
+          border-radius: 999px;
+          background: rgba(207, 47, 47, .06);
+          color: ${RED};
+          font-size: 11px;
+          font-weight: 700;
+          line-height: 1.2;
+          text-decoration: none;
+          transition: background .15s ease, border-color .15s ease;
+        }
+        .venmo-credit-link span {
+          color: ${INK};
+          font-weight: 600;
+        }
+        .venmo-credit-link:hover {
+          border-color: rgba(207, 47, 47, .38);
+          background: rgba(207, 47, 47, .1);
         }
         .session-view-toggle {
           display: flex;
