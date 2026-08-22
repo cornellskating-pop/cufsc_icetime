@@ -1,6 +1,6 @@
 # CUFSC Ice Time — Technical Design
 
-Last reconciled with the application and exported Supabase schema: July 26, 2026.
+Last reconciled with the application and migrations: August 22, 2026.
 
 ## System boundary
 
@@ -13,7 +13,7 @@ Next.js browser UI
   └── PostgreSQL RPC functions
         ├── booking and credit transactions
         ├── admin operations
-        └── approval inserts
+        └── approval inserts and status changes
               └── pg_net trigger
                     └── Supabase Edge Function
                           └── Resend
@@ -161,7 +161,12 @@ RLS remains enabled on users, sessions, bookings, approvals, tiers, and the cred
 
 ## Approval notifications
 
-An insert trigger calls the `notify-admins` Edge Function through `pg_net`.
+An `approval_requests` trigger calls the `notify-admins` Edge Function through `pg_net`. It runs for inserts and status updates, but the trigger function sends a webhook only for:
+
+- Every new request insert, which produces an admin alert.
+- A `NEW_USER` request changing to `APPROVED`, which produces a requester confirmation.
+
+Session approvals, denials, and unrelated updates do not send requester emails.
 
 Authentication uses a random shared value:
 
@@ -174,10 +179,13 @@ The Edge Function:
 1. Validates method and webhook secret.
 2. Reads only the approval ID from the payload.
 3. Reloads the authoritative approval record from PostgreSQL.
-4. Loads recipient addresses.
-5. Sends through Resend.
+4. Uses the event type and authoritative request status to choose the message.
+5. Loads recipient addresses.
+6. Sends through Resend.
 
-`NOTIFY_EMAIL` can override recipients with a comma-separated list; otherwise all current admin email addresses are used. `APP_URL`, `FROM_EMAIL`, and the backend key are configurable secrets.
+For new-request alerts, `NOTIFY_EMAIL` can override recipients with a comma-separated list; otherwise all current admin email addresses are used. For an approved new account, the recipient is always that request's `requester_email`. `NOTIFY_EMAIL` does not redirect member confirmations.
+
+`APP_URL`, `FROM_EMAIL`, and the backend key are configurable secrets. `FROM_EMAIL` controls the sender for both message types and must be a Resend-verified sender. The code fallback is `CUFSC Booking <onboarding@resend.dev>`.
 
 The function is deployed with platform JWT verification disabled because it performs its own webhook authentication.
 
@@ -191,11 +199,14 @@ supabase/functions/          Edge Function source
 supabase/migrations/         Versioned database source of truth
 supabase/tests/              Transactional database smoke tests
 README.md                    Developer quick start
+CONTRIBUTING.md              Human and AI-assisted change workflow
+AGENTS.md                    Repository instructions for AI coding tools
 HANDOFF.md                   Operations and deployment
 DESIGN.md                    This technical reference
+.github/                     Pull-request checklist
 ```
 
-Schema inspection dumps are ignored. They can include database webhook headers even when they contain no table data.
+Schema inspection dumps, including local `supabase/schema.sql`, are ignored. They are not maintained documentation and can include database webhook headers even when they contain no table data. Migrations are the database source of truth.
 
 ## Known operational dependencies
 

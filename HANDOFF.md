@@ -1,6 +1,6 @@
 # CUFSC Ice Time — Operations and Handoff
 
-This guide covers routine administration, development, deployment, and recovery.
+This guide covers routine administration, deployment, and recovery. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full human and AI-assisted development workflow.
 
 ## Services
 
@@ -32,7 +32,7 @@ Install Node.js 20+, Git, and Docker Desktop. Then:
 ```bash
 git clone https://github.com/cornellskating-pop/cufsc_icetime.git
 cd cufsc_icetime
-npm install
+npm ci
 npx supabase login
 npx supabase link --project-ref dtdyvpjmavurynbccjei
 ```
@@ -125,6 +125,16 @@ npx supabase functions deploy notify-admins --no-verify-jwt
 
 The function authenticates database webhooks with `x-webhook-secret`; Supabase’s legacy JWT verification is intentionally disabled for this function.
 
+Notification behavior:
+
+| Event | Recipient | Message |
+|---|---|---|
+| Any new approval request | `NOTIFY_EMAIL`, or all admins when unset | Link to `/admin/approvals` |
+| `NEW_USER` changes to `APPROVED` | The requester's email | Account approved and link to the booking app |
+| Denial, session approval, or unrelated update | None | No email |
+
+Both messages use `FROM_EMAIL`. If it is unset, the code fallback is `CUFSC Booking <onboarding@resend.dev>`. Configure a Resend-verified sender before relying on a club or Cornell-domain address.
+
 ## Deployment order
 
 For an ordinary frontend-only change:
@@ -135,18 +145,17 @@ git push
 
 Vercel deploys the pushed branch automatically.
 
-For the first security migration:
+For a change that includes both an Edge Function and a database trigger or migration:
 
 1. Confirm a current Supabase backup is available.
 2. Configure the matching Vault and Edge Function webhook secrets.
 3. Confirm the Supabase-managed `SUPABASE_SECRET_KEYS` default secret is available.
-4. Mark the baseline migration as applied.
-5. Run and review `supabase db push --dry-run`.
-6. Deploy `notify-admins` with `--no-verify-jwt`.
-7. Apply the database migration during a quiet period.
-8. Run the production verification checklist.
-9. Configure the Vercel publishable key and deploy the frontend.
-10. Verify key usage, then deactivate the legacy keys.
+4. Run `npx supabase migration list`; local and remote history must match except for the intended new migration.
+5. Run and review `npx supabase db push --dry-run`; stop if it lists unrelated migrations.
+6. Deploy the compatible Edge Function before enabling a trigger that calls it.
+7. Apply the reviewed migration with `npx supabase db push` only with explicit production authorization.
+8. Run the production verification checklist and inspect Supabase and Resend logs.
+9. Commit and push the exact deployed source and migration so GitHub and production do not drift.
 
 The weekly reset cron job must use schedule `30 20,21 * * 0` and execute
 `select private.scheduled_weekly_reset_credits();`. Supabase cron schedules
@@ -156,7 +165,7 @@ invocation that is actually Sunday at 4:30 PM, keeping the schedule correct
 across daylight-saving transitions. `public.admin_weekly_reset_credits()`
 remains the authenticated manual admin RPC.
 
-There can be a short notification gap between steps 6 and 7. Approval records remain in the database even if an email is missed.
+Approval records remain in the database if notification delivery fails. Because webhook delivery is asynchronous, approval success does not guarantee email delivery; verify failures in the services listed under Recovery.
 
 ## Production verification
 
