@@ -3,12 +3,14 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 type ApprovalRecord = {
   id: string;
   type: "NEW_USER" | "SESSION";
+  status: "OPEN" | "APPROVED" | "DENIED" | "FAILED";
   requester_email: string | null;
   user_id: string | null;
   session_id: string | null;
 };
 
 type WebhookPayload = {
+  type?: "INSERT" | "UPDATE";
   record?: { id?: unknown };
 };
 
@@ -57,10 +59,42 @@ Deno.serve(async (req) => {
 
     const { data: row, error: requestError } = await supabase
       .from("approval_requests")
-      .select("id, type, requester_email, user_id, session_id")
+      .select("id, type, status, requester_email, user_id, session_id")
       .eq("id", approvalId)
       .single<ApprovalRecord>();
     if (requestError || !row) throw requestError ?? new Error("Approval request not found");
+
+    if (payload.type === "UPDATE") {
+      if (row.type !== "NEW_USER" || row.status !== "APPROVED") {
+        return new Response("No requester notification needed", { status: 200 });
+      }
+
+      const recipients = validUniqueEmails([row.requester_email]);
+      if (recipients.length === 0) {
+        return new Response("No valid requester email", { status: 200 });
+      }
+
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: FROM_EMAIL,
+          to: recipients,
+          subject: "Your CUFSC Booking account is approved",
+          text: `Your request to join the CUFSC booking system has been approved.
+
+You can now sign in and book ice sessions at: ${APP_URL}`,
+        }),
+      });
+      if (!res.ok) {
+        throw new Error(`Resend returned ${res.status}: ${await res.text()}`);
+      }
+
+      return new Response("OK", { status: 200 });
+    }
 
     const { data: admins, error: adminErr } = await supabase
       .from("users")

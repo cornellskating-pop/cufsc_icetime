@@ -113,7 +113,7 @@ Other Edge Function variables:
 |---|---|
 | `RESEND_API_KEY` | Resend authentication |
 | `SUPABASE_SECRET_KEYS` | Supabase-managed JSON map; the function reads its `default` secret key |
-| `NOTIFY_EMAIL` | Optional comma-separated override recipients; otherwise all admin emails are used |
+| `NOTIFY_EMAIL` | Optional comma-separated override recipients for new-request alerts; otherwise all admin emails are used |
 | `FROM_EMAIL` | Verified Resend sender |
 | `APP_URL` | Defaults to `https://cufscice.vercel.app` |
 
@@ -171,6 +171,7 @@ There can be a short notification gap between steps 6 and 7. Approval records re
 - Cancelling a free or approved booking never creates a credit.
 - Capacity cannot be exceeded by concurrent requests.
 - Approval notification arrives and links to `https://cufscice.vercel.app/admin/approvals`.
+- An approved new member receives an email linking to the booking app.
 - Vercel and Supabase logs show no new errors.
 
 ## Recovery
