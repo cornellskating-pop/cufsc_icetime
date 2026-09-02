@@ -239,6 +239,21 @@ function isShowSession(session: Session) {
   return (session.label ?? session.notes)?.toLowerCase().includes("show") ?? false;
 }
 
+function isTryoutSession(session: Session) {
+  return (session.label ?? session.notes)?.toLowerCase().includes("tryout") ?? false;
+}
+
+function TryoutMark() {
+  return (
+    <svg className="tryout-mark" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7 3.5v10.2c0 2.5 2 4.5 4.5 4.5h4.8" />
+      <path d="M7 12.5h6.4l1.9 3.2H19" />
+      <path d="M5 20c4.2 1.1 9.3 1.1 14.5-.4" />
+      <path d="m17.8 3 .6 1.6L20 5.2l-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6.6-1.6Z" />
+    </svg>
+  );
+}
+
 function SessionRow({
   s,
   checked,
@@ -256,13 +271,14 @@ function SessionRow({
 }) {
   const { status, badgeLabel, subtext } = getSessionStatus(s, new Date(nowMs));
   const showSession = isShowSession(s);
+  const tryoutSession = isTryoutSession(s);
   const displayChecked = checked || booked;
   const isDisabled =
     booked || disabled || status === "ended" || status === "full" || status === "closed" || status === "soon";
 
   return (
     <div
-      className={`session-row${booked ? " booked" : ""}${showSession ? " show-session" : ""}`}
+      className={`session-row${booked ? " booked" : ""}${showSession ? " show-session" : ""}${tryoutSession ? " tryout-session" : ""}`}
       onClick={() => !isDisabled && onToggle()}
       style={{
         padding: "13px 20px",
@@ -271,7 +287,9 @@ function SessionRow({
         alignItems: "center",
         gap: 12,
         cursor: isDisabled ? "not-allowed" : "pointer",
-        background: showSession
+        background: tryoutSession
+          ? "linear-gradient(135deg, rgba(255,249,230,.98), rgba(255,239,238,.98))"
+          : showSession
           ? "linear-gradient(135deg, rgba(240,252,255,.98), rgba(249,244,255,.98))"
           : booked
           ? "linear-gradient(135deg, rgba(237,246,248,.96), rgba(255,255,255,.96))"
@@ -331,6 +349,7 @@ function SessionRow({
       </div>
 
       <span className="session-badges">
+        {tryoutSession && <span className="badge badge-tryout"><TryoutMark />Tryouts</span>}
         {showSession && <span className="badge badge-show">Show</span>}
         <span className={`badge badge-${booked ? "active" : status}`}>
           {booked ? "Booked" : badgeLabel}
@@ -439,6 +458,7 @@ function CalendarView({
                     const checked = selected.includes(session.id);
                     const booked = bookedSessionIds.has(session.id);
                     const showSession = isShowSession(session);
+                    const tryoutSession = isTryoutSession(session);
                     const locked = status === "soon";
                     const unavailable =
                       status === "ended" || status === "full" || status === "closed";
@@ -463,7 +483,7 @@ function CalendarView({
                     return (
                       <button
                         type="button"
-                        className={`calendar-session-block status-${status} timeline-${timeline.phase}${checked ? " selected" : ""}${booked ? " booked" : ""}${showSession ? " show-session" : ""}`}
+                        className={`calendar-session-block status-${status} timeline-${timeline.phase}${checked ? " selected" : ""}${booked ? " booked" : ""}${showSession ? " show-session" : ""}${tryoutSession ? " tryout-session" : ""}`}
                         disabled={disabled}
                         onClick={() => onToggle(session.id)}
                         title={`${session.label || session.notes || "Ice session"} · ${formatET(session.start_time)} · ${timeline.primary}${timeline.secondary ? ` · ${timeline.secondary}` : ""}`}
@@ -475,6 +495,7 @@ function CalendarView({
                         </span>
                         <span className="calendar-session-copy">
                           <span className="calendar-session-time">
+                            {tryoutSession && <span className="calendar-tryout-label"><TryoutMark />Tryouts</span>}
                             {showSession && <span className="calendar-show-label">Show</span>}
                             {formatCalendarTime(session.start_time)}
                           </span>
@@ -1118,6 +1139,14 @@ export default function Dashboard() {
             0 0 10px rgba(126, 143, 229, .2);
           animation: showRowGlow 2.8s ease-in-out infinite;
         }
+        .session-row.tryout-session {
+          outline: 1.5px solid transparent;
+          outline-offset: -2px;
+          box-shadow:
+            inset 4px 0 0 #E6A736,
+            inset -2px 0 0 #D86878,
+            0 0 12px rgba(216, 104, 120, .18);
+        }
         .session-badges {
           position: relative;
           z-index: 1;
@@ -1132,6 +1161,25 @@ export default function Dashboard() {
           background: linear-gradient(120deg, #DDF7FB, #E8E1FF, #F3DDF8);
           color: #6250A4;
           box-shadow: 0 0 8px rgba(126, 143, 229, .2);
+        }
+        .badge-tryout {
+          border: 1px solid rgba(191, 120, 28, .36);
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+          background: linear-gradient(120deg, #FFF0B8, #FFDADD);
+          color: #8B3C3C;
+          box-shadow: 0 0 8px rgba(224, 151, 45, .2);
+        }
+        .tryout-mark {
+          width: 14px;
+          height: 14px;
+          fill: none;
+          stroke: currentColor;
+          stroke-width: 1.7;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+          flex: 0 0 auto;
         }
         .session-row > :not(.booked-snow-overlay),
         .calendar-session-block > :not(.booked-snow-overlay) {
@@ -1328,6 +1376,22 @@ export default function Dashboard() {
             linear-gradient(120deg, #7CE1EA, #BBA2FF, #F0A9EC, #7CE1EA) border-box;
           color: white;
         }
+        .calendar-session-block.tryout-session {
+          border: 1.5px solid transparent;
+          background:
+            linear-gradient(135deg, #FFF9E4, #FFECEF) padding-box,
+            linear-gradient(120deg, #E7AE3D, #D86878, #E7AE3D) border-box;
+          color: #823B3B;
+          box-shadow: 0 0 10px rgba(216, 104, 120, .2);
+          filter: none;
+          opacity: 1;
+        }
+        .calendar-session-block.tryout-session.selected {
+          background:
+            linear-gradient(135deg, #B65B44, #A43F61) padding-box,
+            linear-gradient(120deg, #FFE49A, #FFB8C4, #FFE49A) border-box;
+          color: white;
+        }
         .calendar-show-label {
           margin-right: 3px;
           border-radius: 3px;
@@ -1341,6 +1405,26 @@ export default function Dashboard() {
           line-height: 1.2;
           text-transform: uppercase;
           vertical-align: 1px;
+        }
+        .calendar-tryout-label {
+          margin-right: 3px;
+          border-radius: 3px;
+          padding: 1px 3px;
+          display: inline-flex;
+          align-items: center;
+          gap: 2px;
+          background: linear-gradient(120deg, #FFE9A4, #FFD1D8);
+          color: #823B3B;
+          font-size: 6px;
+          font-weight: 800;
+          letter-spacing: .04em;
+          line-height: 1.2;
+          text-transform: uppercase;
+          vertical-align: 1px;
+        }
+        .calendar-tryout-label .tryout-mark {
+          width: 8px;
+          height: 8px;
         }
         .calendar-session-block .booked-snow-overlay {
           opacity: .3;
