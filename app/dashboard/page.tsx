@@ -243,6 +243,10 @@ function isTryoutSession(session: Session) {
   return (session.label ?? session.notes)?.toLowerCase().includes("tryout") ?? false;
 }
 
+function isCompetitionTeamSession(session: Session) {
+  return (session.label ?? session.notes)?.toLowerCase().includes("competition team") ?? false;
+}
+
 function TryoutMark() {
   return (
     <svg className="tryout-mark" viewBox="0 0 24 24" aria-hidden="true">
@@ -250,6 +254,15 @@ function TryoutMark() {
       <path d="M7 12.5h6.4l1.9 3.2H19" />
       <path d="M5 20c4.2 1.1 9.3 1.1 14.5-.4" />
       <path d="m17.8 3 .6 1.6L20 5.2l-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6.6-1.6Z" />
+    </svg>
+  );
+}
+
+function TeamMark() {
+  return (
+    <svg className="team-mark" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 2.5 20 6v5.5c0 4.5-3 8.1-8 10-5-1.9-8-5.5-8-10V6l8-3.5Z" />
+      <path d="m12 6.7 1.3 2.7 3 .4-2.2 2.1.6 3-2.7-1.4-2.7 1.4.6-3-2.2-2.1 3-.4L12 6.7Z" />
     </svg>
   );
 }
@@ -272,13 +285,14 @@ function SessionRow({
   const { status, badgeLabel, subtext } = getSessionStatus(s, new Date(nowMs));
   const showSession = isShowSession(s);
   const tryoutSession = isTryoutSession(s);
+  const teamSession = isCompetitionTeamSession(s);
   const displayChecked = checked || booked;
   const isDisabled =
     booked || disabled || status === "ended" || status === "full" || status === "closed" || status === "soon";
 
   return (
     <div
-      className={`session-row${booked ? " booked" : ""}${showSession ? " show-session" : ""}${tryoutSession ? " tryout-session" : ""}`}
+      className={`session-row${booked ? " booked" : ""}${showSession ? " show-session" : ""}${tryoutSession ? " tryout-session" : ""}${teamSession ? " team-session" : ""}`}
       onClick={() => !isDisabled && onToggle()}
       style={{
         padding: "13px 20px",
@@ -287,14 +301,16 @@ function SessionRow({
         alignItems: "center",
         gap: 12,
         cursor: isDisabled ? "not-allowed" : "pointer",
-        background: tryoutSession
+        background: teamSession
+          ? "linear-gradient(135deg, rgba(232,248,247,.98), rgba(231,239,255,.98))"
+          : tryoutSession
           ? "linear-gradient(135deg, rgba(255,249,230,.98), rgba(255,239,238,.98))"
           : showSession
           ? "linear-gradient(135deg, rgba(240,252,255,.98), rgba(249,244,255,.98))"
           : booked
           ? "linear-gradient(135deg, rgba(237,246,248,.96), rgba(255,255,255,.96))"
           : checked ? RED_LIGHT : "white",
-        opacity: status === "ended" || status === "full" ? 0.45 : 1,
+        opacity: teamSession ? 1 : status === "ended" || status === "full" ? 0.45 : 1,
         transition: "background .15s",
       }}
     >
@@ -349,6 +365,7 @@ function SessionRow({
       </div>
 
       <span className="session-badges">
+        {teamSession && <span className="badge badge-team"><TeamMark />Competition Team</span>}
         {tryoutSession && <span className="badge badge-tryout"><TryoutMark />Tryouts</span>}
         {showSession && <span className="badge badge-show">Show</span>}
         <span className={`badge badge-${booked ? "active" : status}`}>
@@ -459,6 +476,7 @@ function CalendarView({
                     const booked = bookedSessionIds.has(session.id);
                     const showSession = isShowSession(session);
                     const tryoutSession = isTryoutSession(session);
+                    const teamSession = isCompetitionTeamSession(session);
                     const locked = status === "soon";
                     const unavailable =
                       status === "ended" || status === "full" || status === "closed";
@@ -483,7 +501,7 @@ function CalendarView({
                     return (
                       <button
                         type="button"
-                        className={`calendar-session-block status-${status} timeline-${timeline.phase}${checked ? " selected" : ""}${booked ? " booked" : ""}${showSession ? " show-session" : ""}${tryoutSession ? " tryout-session" : ""}`}
+                        className={`calendar-session-block status-${status} timeline-${timeline.phase}${checked ? " selected" : ""}${booked ? " booked" : ""}${showSession ? " show-session" : ""}${tryoutSession ? " tryout-session" : ""}${teamSession ? " team-session" : ""}`}
                         disabled={disabled}
                         onClick={() => onToggle(session.id)}
                         title={`${session.label || session.notes || "Ice session"} · ${formatET(session.start_time)} · ${timeline.primary}${timeline.secondary ? ` · ${timeline.secondary}` : ""}`}
@@ -495,6 +513,7 @@ function CalendarView({
                         </span>
                         <span className="calendar-session-copy">
                           <span className="calendar-session-time">
+                            {teamSession && <span className="calendar-team-label"><TeamMark />Team</span>}
                             {tryoutSession && <span className="calendar-tryout-label"><TryoutMark />Tryouts</span>}
                             {showSession && <span className="calendar-show-label">Show</span>}
                             {formatCalendarTime(session.start_time)}
@@ -1147,6 +1166,14 @@ export default function Dashboard() {
             inset -2px 0 0 #D86878,
             0 0 12px rgba(216, 104, 120, .18);
         }
+        .session-row.team-session {
+          outline: 1.5px solid transparent;
+          outline-offset: -2px;
+          box-shadow:
+            inset 4px 0 0 #2A9D8F,
+            inset -2px 0 0 #5271C4,
+            0 0 12px rgba(42, 157, 143, .18);
+        }
         .session-badges {
           position: relative;
           z-index: 1;
@@ -1171,12 +1198,31 @@ export default function Dashboard() {
           color: #8B3C3C;
           box-shadow: 0 0 8px rgba(224, 151, 45, .2);
         }
+        .badge-team {
+          border: 1px solid rgba(37, 120, 135, .34);
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+          background: linear-gradient(120deg, #D7F4EF, #DDE6FF);
+          color: #245B72;
+          box-shadow: 0 0 8px rgba(42, 157, 143, .2);
+        }
         .tryout-mark {
           width: 14px;
           height: 14px;
           fill: none;
           stroke: currentColor;
           stroke-width: 1.7;
+          stroke-linecap: round;
+          stroke-linejoin: round;
+          flex: 0 0 auto;
+        }
+        .team-mark {
+          width: 14px;
+          height: 14px;
+          fill: none;
+          stroke: currentColor;
+          stroke-width: 1.6;
           stroke-linecap: round;
           stroke-linejoin: round;
           flex: 0 0 auto;
@@ -1392,6 +1438,16 @@ export default function Dashboard() {
             linear-gradient(120deg, #FFE49A, #FFB8C4, #FFE49A) border-box;
           color: white;
         }
+        .calendar-session-block.team-session {
+          border: 1.5px solid transparent;
+          background:
+            linear-gradient(135deg, #E8F8F7, #E7EFFF) padding-box,
+            linear-gradient(120deg, #2A9D8F, #5271C4, #2A9D8F) border-box;
+          color: #245B72;
+          box-shadow: 0 0 10px rgba(42, 157, 143, .22);
+          filter: none;
+          opacity: 1;
+        }
         .calendar-show-label {
           margin-right: 3px;
           border-radius: 3px;
@@ -1423,6 +1479,26 @@ export default function Dashboard() {
           vertical-align: 1px;
         }
         .calendar-tryout-label .tryout-mark {
+          width: 8px;
+          height: 8px;
+        }
+        .calendar-team-label {
+          margin-right: 3px;
+          border-radius: 3px;
+          padding: 1px 3px;
+          display: inline-flex;
+          align-items: center;
+          gap: 2px;
+          background: linear-gradient(120deg, #CFF1EB, #D9E3FF);
+          color: #245B72;
+          font-size: 6px;
+          font-weight: 800;
+          letter-spacing: .04em;
+          line-height: 1.2;
+          text-transform: uppercase;
+          vertical-align: 1px;
+        }
+        .calendar-team-label .team-mark {
           width: 8px;
           height: 8px;
         }
