@@ -1,6 +1,6 @@
 # CUFSC Ice Time — Technical Design
 
-Last reconciled with the application and migrations: August 22, 2026.
+Last reconciled with the application and migrations: September 7, 2026.
 
 ## System boundary
 
@@ -67,6 +67,10 @@ The admin layout verifies the current profile before mounting admin pages. Every
 | `created_at timestamptz` | Creation time |
 
 Members can read their own profile but cannot update credit, tier, dues, or admin fields directly.
+All non-admin accounts were converted to the zero-credit `temp` tier by the
+September 7, 2026 account-normalization migration. Admin accounts were left
+unchanged. Admins can still change an individual member's tier and credits
+through the checked user-management RPC.
 
 ### `tiers`
 
@@ -141,12 +145,17 @@ All admin functions are SECURITY DEFINER, set a fixed search path, and call `is_
 - `admin_delete_session`
 - `admin_upsert_user`
 - `admin_delete_user`
+- `admin_reset_non_admin_accounts_to_temp`
 - `admin_approve_request`
 - `admin_approve_user_request`
 - `admin_deny_request`
 - `admin_weekly_reset_credits`
 
 Approval and booking operations lock the affected rows. Approved temporary-member bookings do not charge a credit.
+The non-admin account reset is a manual beginning-of-semester operation. It
+atomically changes every non-admin member to the zero-credit `temp` tier while
+leaving admin accounts unchanged. The Admin Tools UI requires an explicit
+confirmation before invoking the checked RPC.
 
 ## Authorization
 

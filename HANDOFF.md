@@ -22,6 +22,18 @@ Supabase project reference: `dtdyvpjmavurynbccjei`
 - Review attendance: `/admin/bookings`
 - Approve or deny requests: `/admin/approvals`
 - Run the weekly credit reset manually: `/admin/tools`
+- Reset all non-admin accounts to the zero-credit `temp` tier: `/admin/tools`
+
+The September 7, 2026 account-normalization migration changes every existing
+non-admin account to the zero-credit `temp` tier. It does not alter admin
+accounts. This is a one-time data migration; later per-member tier changes can
+still be made through `/admin/users`.
+
+For future semesters, use **Reset non-admin accounts to temp** on the Admin
+Tools page. The confirmation explains that the operation is normally used only
+at the beginning of a semester. Confirming immediately sets every non-admin
+member's tier to `temp` and credits to zero; it cannot automatically restore
+their previous values.
 
 Admin UI visibility is checked in the browser, but PostgreSQL RPC authorization and RLS are the security boundary.
 

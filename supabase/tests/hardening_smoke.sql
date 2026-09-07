@@ -94,6 +94,15 @@ begin
         raise;
       end if;
   end;
+  begin
+    perform public.admin_reset_non_admin_accounts_to_temp();
+    raise exception 'Non-admin unexpectedly reset member accounts';
+  exception
+    when others then
+      if sqlerrm not like '%Not authorized%' then
+        raise;
+      end if;
+  end;
 end;
 $$;
 
@@ -202,6 +211,38 @@ begin
   end if;
   if has_table_privilege('authenticated', 'public.users', 'update') then
     raise exception 'Members must not have direct profile update privileges';
+  end if;
+end;
+$$;
+
+select public.admin_reset_non_admin_accounts_to_temp();
+
+do $$
+begin
+  if exists (
+    select 1
+    from public.users
+    where is_admin = false
+      and (tier <> 'temp' or credits_balance <> 0)
+  ) then
+    raise exception 'The semester reset must convert every non-admin account to zero-credit temp';
+  end if;
+  if not exists (
+    select 1
+    from public.users
+    where email = 'admin@example.test'
+      and is_admin = true
+      and tier = 'basic'
+      and credits_balance = 2
+  ) then
+    raise exception 'The semester reset must leave admin accounts unchanged';
+  end if;
+  if has_function_privilege(
+    'anon',
+    'public.admin_reset_non_admin_accounts_to_temp()',
+    'execute'
+  ) then
+    raise exception 'Anon must not be able to execute the semester account reset';
   end if;
 end;
 $$;
