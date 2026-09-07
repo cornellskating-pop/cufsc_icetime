@@ -14,6 +14,16 @@ type WebhookPayload = {
   record?: { id?: unknown };
 };
 
+type MemberRecord = {
+  email: string;
+  name: string | null;
+};
+
+type SessionRecord = {
+  start_time: string;
+  end_time: string;
+};
+
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const BACKEND_SECRET_KEY = (() => {
@@ -27,6 +37,7 @@ const BACKEND_SECRET_KEY = (() => {
 const WEBHOOK_SECRET = Deno.env.get("NOTIFY_WEBHOOK_SECRET");
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") ?? "CUFSC Booking <onboarding@resend.dev>";
 const APP_URL = Deno.env.get("APP_URL") ?? "https://cufscice.vercel.app";
+const CLUB_NOTIFICATION_EMAIL = "cornellskating@gmail.com";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const validUniqueEmails = (emails: Array<string | null | undefined>) => [
@@ -36,6 +47,44 @@ const validUniqueEmails = (emails: Array<string | null | undefined>) => [
       .filter(email => EMAIL_PATTERN.test(email)),
   ),
 ];
+
+const formatSessionTime = (startTime: string, endTime: string) => {
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  const date = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(start);
+  const timeFormatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  return `${date}, ${timeFormatter.format(start)}–${timeFormatter.format(end)} ET`;
+};
+
+const sendEmail = async (to: string[], subject: string, body: string) => {
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: FROM_EMAIL,
+      to,
+      subject,
+      text: body,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`Resend returned ${res.status}: ${await res.text()}`);
+  }
+};
 
 Deno.serve(async (req) => {
   try {
@@ -65,33 +114,63 @@ Deno.serve(async (req) => {
     if (requestError || !row) throw requestError ?? new Error("Approval request not found");
 
     if (payload.type === "UPDATE") {
-      if (row.type !== "NEW_USER" || row.status !== "APPROVED") {
+      if (row.status !== "APPROVED") {
         return new Response("No requester notification needed", { status: 200 });
       }
 
-      const recipients = validUniqueEmails([row.requester_email]);
-      if (recipients.length === 0) {
-        return new Response("No valid requester email", { status: 200 });
-      }
+      if (row.type === "NEW_USER") {
+        const recipients = validUniqueEmails([row.requester_email]);
+        if (recipients.length === 0) {
+          return new Response("No valid requester email", { status: 200 });
+        }
 
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${RESEND_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: FROM_EMAIL,
-          to: recipients,
-          subject: "Your CUFSC Booking account is approved",
-          text: `Your request to join the CUFSC booking system has been approved.
+        await sendEmail(
+          recipients,
+          "Your CUFSC Booking account is approved",
+          `Your request to join the CUFSC booking system has been approved.
 
 You can now sign in and book ice sessions at: ${APP_URL}`,
-        }),
-      });
-      if (!res.ok) {
-        throw new Error(`Resend returned ${res.status}: ${await res.text()}`);
+        );
+        return new Response("OK", { status: 200 });
       }
+
+      if (!row.user_id || !row.session_id) {
+        return new Response("Session request is missing user or session", { status: 200 });
+      }
+
+      const [{ data: member, error: memberError }, { data: session, error: sessionError }] =
+        await Promise.all([
+          supabase
+            .from("users")
+            .select("email, name")
+            .eq("id", row.user_id)
+            .single<MemberRecord>(),
+          supabase
+            .from("sessions")
+            .select("start_time, end_time")
+            .eq("id", row.session_id)
+            .single<SessionRecord>(),
+        ]);
+
+      if (memberError || !member) throw memberError ?? new Error("Requesting member not found");
+      if (sessionError || !session) throw sessionError ?? new Error("Requested session not found");
+
+      const recipients = validUniqueEmails([member.email]);
+      if (recipients.length === 0) {
+        return new Response("No valid member email", { status: 200 });
+      }
+
+      await sendEmail(
+        recipients,
+        "Your CUFSC ice session is approved",
+        `Hi${member.name ? ` ${member.name}` : ""},
+
+Your request to book the following CUFSC ice session has been approved, and your spot is confirmed.
+
+Session: ${formatSessionTime(session.start_time, session.end_time)}
+
+View your bookings at: ${APP_URL}/dashboard`,
+      );
 
       return new Response("OK", { status: 200 });
     }
@@ -106,9 +185,13 @@ You can now sign in and book ice sessions at: ${APP_URL}`,
     const configuredRecipients = validUniqueEmails(
       (Deno.env.get("NOTIFY_EMAIL") ?? "").split(","),
     );
-    const recipients = configuredRecipients.length > 0
+    const notificationRecipients = configuredRecipients.length > 0
       ? configuredRecipients
       : validUniqueEmails((admins ?? []).map(admin => admin.email));
+    const recipients = validUniqueEmails([
+      ...notificationRecipients,
+      CLUB_NOTIFICATION_EMAIL,
+    ]);
     if (recipients.length === 0) return new Response("No notification recipients", { status: 200 });
 
     let subject: string;
@@ -144,22 +227,7 @@ Session: ${sessionId}
 Review and approve or deny at: ${APP_URL}/admin/approvals`;
     }
 
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: FROM_EMAIL,
-        to: recipients,
-        subject,
-        text: body,
-      }),
-    });
-    if (!res.ok) {
-      throw new Error(`Resend returned ${res.status}: ${await res.text()}`);
-    }
+    await sendEmail(recipients, subject, body);
 
     return new Response("OK", { status: 200 });
   } catch (err) {

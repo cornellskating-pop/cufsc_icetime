@@ -141,11 +141,13 @@ Notification behavior:
 
 | Event | Recipient | Message |
 |---|---|---|
-| Any new approval request | `NOTIFY_EMAIL`, or all admins when unset | Link to `/admin/approvals` |
+| New account request | `cornellskating@gmail.com`, plus `NOTIFY_EMAIL` or all admins when unset | Requester email and link to `/admin/approvals` |
+| New session request | `cornellskating@gmail.com`, plus `NOTIFY_EMAIL` or all admins when unset | Member/session details and link to `/admin/approvals` |
 | `NEW_USER` changes to `APPROVED` | The requester's email | Account approved and link to the booking app |
-| Denial, session approval, or unrelated update | None | No email |
+| `SESSION` changes to `APPROVED` | The requesting member's email | Confirmed session time and link to their bookings |
+| Denial or unrelated update | None | No email |
 
-Both messages use `FROM_EMAIL`. If it is unset, the code fallback is `CUFSC Booking <onboarding@resend.dev>`. Configure a Resend-verified sender before relying on a club or Cornell-domain address.
+All messages use `FROM_EMAIL`. If it is unset, the code fallback is `CUFSC Booking <onboarding@resend.dev>`. Configure a Resend-verified sender before relying on a club or Cornell-domain address.
 
 ## Deployment order
 
@@ -192,7 +194,9 @@ Approval records remain in the database if notification delivery fails. Because 
 - Cancelling a free or approved booking never creates a credit.
 - Capacity cannot be exceeded by concurrent requests.
 - Approval notification arrives and links to `https://cufscice.vercel.app/admin/approvals`.
+- New account and temporary-member session requests notify `cornellskating@gmail.com`.
 - An approved new member receives an email linking to the booking app.
+- A member receives an email when an administrator approves a requested session.
 - Vercel and Supabase logs show no new errors.
 
 ## Recovery

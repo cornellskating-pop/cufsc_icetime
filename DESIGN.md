@@ -173,9 +173,10 @@ RLS remains enabled on users, sessions, bookings, approvals, tiers, and the cred
 An `approval_requests` trigger calls the `notify-admins` Edge Function through `pg_net`. It runs for inserts and status updates, but the trigger function sends a webhook only for:
 
 - Every new request insert, which produces an admin alert.
-- A `NEW_USER` request changing to `APPROVED`, which produces a requester confirmation.
+- A `NEW_USER` request changing to `APPROVED`, which produces an account confirmation.
+- A `SESSION` request changing to `APPROVED`, which produces a booking confirmation.
 
-Session approvals, denials, and unrelated updates do not send requester emails.
+Denials and unrelated updates do not send requester emails.
 
 Authentication uses a random shared value:
 
@@ -192,9 +193,9 @@ The Edge Function:
 5. Loads recipient addresses.
 6. Sends through Resend.
 
-For new-request alerts, `NOTIFY_EMAIL` can override recipients with a comma-separated list; otherwise all current admin email addresses are used. For an approved new account, the recipient is always that request's `requester_email`. `NOTIFY_EMAIL` does not redirect member confirmations.
+For new-request alerts, `NOTIFY_EMAIL` can override recipients with a comma-separated list; otherwise all current admin email addresses are used. Every new account-access or temporary-member session request also always notifies `cornellskating@gmail.com`. For approved accounts and sessions, the recipient is the member who submitted the request. `NOTIFY_EMAIL` does not redirect member confirmations.
 
-`APP_URL`, `FROM_EMAIL`, and the backend key are configurable secrets. `FROM_EMAIL` controls the sender for both message types and must be a Resend-verified sender. The code fallback is `CUFSC Booking <onboarding@resend.dev>`.
+`APP_URL`, `FROM_EMAIL`, and the backend key are configurable secrets. `FROM_EMAIL` controls the sender for all messages and must be a Resend-verified sender. The code fallback is `CUFSC Booking <onboarding@resend.dev>`.
 
 The function is deployed with platform JWT verification disabled because it performs its own webhook authentication.
 

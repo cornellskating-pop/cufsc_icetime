@@ -8,7 +8,7 @@ Booking and administration system for Cornell University Figure Skating Club ice
 - Supabase Auth handles Google OAuth.
 - Supabase Postgres stores members, tiers, sessions, bookings, approvals, and the credit audit log.
 - PostgreSQL RPC functions are the authoritative business-logic and authorization boundary.
-- A Supabase Edge Function sends new-request alerts to admins and account-approval confirmations to new members through Resend.
+- A Supabase Edge Function sends new-request alerts and account/session approval confirmations through Resend.
 - Vercel hosts the frontend at `https://cufscice.vercel.app`.
 
 Project guides:
