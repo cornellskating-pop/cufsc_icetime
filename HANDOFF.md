@@ -24,6 +24,8 @@ Supabase project reference: `dtdyvpjmavurynbccjei`
 - Run the weekly credit reset manually: `/admin/tools`
 - Reset all non-admin accounts to the zero-credit `temp` tier: `/admin/tools`
 
+Fall 2026 show-practice blocks begin Wednesday, October 21. They appear as purple, zero-capacity sessions and must remain unavailable for member booking. The full December 2 ice time is the all-group dress rehearsal.
+
 The September 7, 2026 account-normalization migration changes every existing
 non-admin account to the zero-credit `temp` tier. It does not alter admin
 accounts. This is a one-time data migration; later per-member tier changes can
@@ -193,6 +195,7 @@ Approval records remain in the database if notification delivery fails. Because 
 - Cancelling a charged booking at least 30 minutes before start refunds one credit.
 - Cancelling a free or approved booking never creates a credit.
 - Capacity cannot be exceeded by concurrent requests.
+- Show-practice sessions display their group in purple and report zero available spots.
 - Approval notification arrives and links to `https://cufscice.vercel.app/admin/approvals`.
 - New account and temporary-member session requests notify `cornellskating@gmail.com`.
 - An approved new member receives an email linking to the booking app.

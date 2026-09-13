@@ -239,6 +239,14 @@ function isShowSession(session: Session) {
   return (session.label ?? session.notes)?.toLowerCase().includes("show") ?? false;
 }
 
+function isShowPracticeSession(session: Session) {
+  return (session.label ?? session.notes)?.toLowerCase().startsWith("show practice:") ?? false;
+}
+
+function getShowPracticeGroup(session: Session) {
+  return (session.label ?? session.notes ?? "Show practice").replace(/^show practice:\s*/i, "");
+}
+
 function isTryoutSession(session: Session) {
   return (session.label ?? session.notes)?.toLowerCase().includes("tryout") ?? false;
 }
@@ -284,6 +292,7 @@ function SessionRow({
 }) {
   const { status, badgeLabel, subtext } = getSessionStatus(s, new Date(nowMs));
   const showSession = isShowSession(s);
+  const showPracticeSession = isShowPracticeSession(s);
   const tryoutSession = isTryoutSession(s);
   const teamSession = isCompetitionTeamSession(s);
   const displayChecked = checked || booked;
@@ -292,7 +301,7 @@ function SessionRow({
 
   return (
     <div
-      className={`session-row${booked ? " booked" : ""}${showSession ? " show-session" : ""}${tryoutSession ? " tryout-session" : ""}${teamSession ? " team-session" : ""}`}
+      className={`session-row${booked ? " booked" : ""}${showSession ? " show-session" : ""}${showPracticeSession ? " show-practice-session" : ""}${tryoutSession ? " tryout-session" : ""}${teamSession ? " team-session" : ""}`}
       onClick={() => !isDisabled && onToggle()}
       style={{
         padding: "13px 20px",
@@ -305,12 +314,14 @@ function SessionRow({
           ? "linear-gradient(135deg, rgba(232,248,247,.98), rgba(231,239,255,.98))"
           : tryoutSession
           ? "linear-gradient(135deg, rgba(255,249,230,.98), rgba(255,239,238,.98))"
+          : showPracticeSession
+          ? "linear-gradient(135deg, rgba(247,240,255,.99), rgba(235,222,255,.99))"
           : showSession
           ? "linear-gradient(135deg, rgba(240,252,255,.98), rgba(249,244,255,.98))"
           : booked
           ? "linear-gradient(135deg, rgba(237,246,248,.96), rgba(255,255,255,.96))"
           : checked ? RED_LIGHT : "white",
-        opacity: teamSession ? 1 : status === "ended" || status === "full" ? 0.45 : 1,
+        opacity: teamSession || showPracticeSession ? 1 : status === "ended" || status === "full" ? 0.45 : 1,
         transition: "background .15s",
       }}
     >
@@ -367,7 +378,9 @@ function SessionRow({
       <span className="session-badges">
         {teamSession && <span className="badge badge-team"><TeamMark />Competition Team</span>}
         {tryoutSession && <span className="badge badge-tryout"><TryoutMark />Tryouts</span>}
-        {showSession && <span className="badge badge-show">Show</span>}
+        {showPracticeSession
+          ? <span className="badge badge-show-practice">Show practice: {getShowPracticeGroup(s)}</span>
+          : showSession && <span className="badge badge-show">Show</span>}
         <span className={`badge badge-${booked ? "active" : status}`}>
           {booked ? "Booked" : badgeLabel}
         </span>
@@ -475,6 +488,7 @@ function CalendarView({
                     const checked = selected.includes(session.id);
                     const booked = bookedSessionIds.has(session.id);
                     const showSession = isShowSession(session);
+                    const showPracticeSession = isShowPracticeSession(session);
                     const tryoutSession = isTryoutSession(session);
                     const teamSession = isCompetitionTeamSession(session);
                     const locked = status === "soon";
@@ -501,7 +515,7 @@ function CalendarView({
                     return (
                       <button
                         type="button"
-                        className={`calendar-session-block status-${status} timeline-${timeline.phase}${checked ? " selected" : ""}${booked ? " booked" : ""}${showSession ? " show-session" : ""}${tryoutSession ? " tryout-session" : ""}${teamSession ? " team-session" : ""}`}
+                        className={`calendar-session-block status-${status} timeline-${timeline.phase}${checked ? " selected" : ""}${booked ? " booked" : ""}${showSession ? " show-session" : ""}${showPracticeSession ? " show-practice-session" : ""}${tryoutSession ? " tryout-session" : ""}${teamSession ? " team-session" : ""}`}
                         disabled={disabled}
                         onClick={() => onToggle(session.id)}
                         title={`${session.label || session.notes || "Ice session"} · ${formatET(session.start_time)} · ${timeline.primary}${timeline.secondary ? ` · ${timeline.secondary}` : ""}`}
@@ -515,7 +529,9 @@ function CalendarView({
                           <span className="calendar-session-time">
                             {teamSession && <span className="calendar-team-label"><TeamMark />Team</span>}
                             {tryoutSession && <span className="calendar-tryout-label"><TryoutMark />Tryouts</span>}
-                            {showSession && <span className="calendar-show-label">Show</span>}
+                            {showPracticeSession
+                              ? <span className="calendar-show-practice-label">{getShowPracticeGroup(session)}</span>
+                              : showSession && <span className="calendar-show-label">Show</span>}
                             {formatCalendarTime(session.start_time)}
                           </span>
                           <span className="calendar-session-status timeline-primary">{timeline.primary}</span>
@@ -1158,6 +1174,15 @@ export default function Dashboard() {
             0 0 10px rgba(126, 143, 229, .2);
           animation: showRowGlow 2.8s ease-in-out infinite;
         }
+        .session-row.show-practice-session {
+          outline: 1.5px solid #8B5CF6;
+          outline-offset: -2px;
+          box-shadow:
+            inset 4px 0 0 #7C3AED,
+            inset -2px 0 0 #A855F7,
+            0 0 12px rgba(124, 58, 237, .25);
+          animation: none;
+        }
         .session-row.tryout-session {
           outline: 1.5px solid transparent;
           outline-offset: -2px;
@@ -1188,6 +1213,12 @@ export default function Dashboard() {
           background: linear-gradient(120deg, #DDF7FB, #E8E1FF, #F3DDF8);
           color: #6250A4;
           box-shadow: 0 0 8px rgba(126, 143, 229, .2);
+        }
+        .badge-show-practice {
+          border: 1px solid rgba(124, 58, 237, .38);
+          background: linear-gradient(120deg, #EDE0FF, #DCC6FF);
+          color: #5B21B6;
+          box-shadow: 0 0 8px rgba(124, 58, 237, .18);
         }
         .badge-tryout {
           border: 1px solid rgba(191, 120, 28, .36);
@@ -1422,6 +1453,17 @@ export default function Dashboard() {
             linear-gradient(120deg, #7CE1EA, #BBA2FF, #F0A9EC, #7CE1EA) border-box;
           color: white;
         }
+        .calendar-session-block.show-practice-session {
+          border: 1.5px solid #8B5CF6;
+          background: linear-gradient(135deg, #F7F0FF, #E9D8FF);
+          color: #5B21B6;
+          box-shadow:
+            inset 3px 0 0 #7C3AED,
+            0 0 10px rgba(124, 58, 237, .24);
+          filter: none;
+          opacity: 1;
+          animation: none;
+        }
         .calendar-session-block.tryout-session {
           border: 1.5px solid transparent;
           background:
@@ -1461,6 +1503,24 @@ export default function Dashboard() {
           line-height: 1.2;
           text-transform: uppercase;
           vertical-align: 1px;
+        }
+        .calendar-show-practice-label {
+          margin-right: 3px;
+          border-radius: 3px;
+          padding: 1px 3px;
+          display: inline-flex;
+          max-width: 100%;
+          overflow: hidden;
+          background: linear-gradient(120deg, #E8D8FF, #D7BEFF);
+          color: #5B21B6;
+          font-size: 6px;
+          font-weight: 800;
+          letter-spacing: .03em;
+          line-height: 1.2;
+          text-overflow: ellipsis;
+          text-transform: uppercase;
+          vertical-align: 1px;
+          white-space: nowrap;
         }
         .calendar-tryout-label {
           margin-right: 3px;

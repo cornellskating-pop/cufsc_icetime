@@ -152,7 +152,7 @@ export default function AdminSessions() {
               ))}
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 5 }}>Capacity</label>
-                <input className="input" type="number" min={1} value={form.capacity} onChange={f("capacity")} />
+                <input className="input" type="number" min={0} value={form.capacity} onChange={f("capacity")} />
               </div>
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 16 }}>

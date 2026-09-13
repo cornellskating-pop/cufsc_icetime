@@ -1,6 +1,6 @@
 # CUFSC Ice Time — Technical Design
 
-Last reconciled with the application and migrations: September 7, 2026.
+Last reconciled with the application and migrations: September 13, 2026.
 
 ## System boundary
 
@@ -79,6 +79,8 @@ Maps a tier name to `weekly_credits`. Weekly reset matching is case-insensitive 
 ### `sessions`
 
 Contains ID, start/end time, optional release time, capacity, and notes. Database constraints require ordered times, release before start, and nonnegative capacity.
+
+From October 21 through the December 2 dress rehearsal, Fall 2026 show-practice blocks are separate zero-capacity sessions. Monday member ice is 8:00–8:35 PM and 8:35–9:10 PM, followed by Group Large practice until 9:45 PM. Wednesday member ice is 8:00–8:33 PM and 8:33–9:05 PM, followed by Group 2 and Group 1/Ice Dance practices. December 2 is reserved in full for the all-group dress rehearsal. Show-practice cards use a purple outline and tint and cannot be booked.
 
 ### `bookings`
 
