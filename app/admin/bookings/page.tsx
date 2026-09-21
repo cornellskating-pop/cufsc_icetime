@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../../lib/supabaseClient";
+import { SessionBookingHeader } from "../../../lib/sessionBookingHeader";
 import { AdminTopBar, Msg } from "../../../lib/ui";
 
 type BookingEntry = {
@@ -88,11 +89,6 @@ export default function AdminBookings() {
       return next;
     });
 
-  const fmt = (d: string) => new Date(d).toLocaleString("en-US", {
-    timeZone: "America/New_York", weekday: "short", month: "short",
-    day: "numeric", hour: "numeric", minute: "2-digit",
-  });
-
   const fmtShort = (d: string) => new Date(d).toLocaleString("en-US", {
     timeZone: "America/New_York", month: "short", day: "numeric",
     hour: "numeric", minute: "2-digit",
@@ -131,26 +127,7 @@ export default function AdminBookings() {
                       display: "flex", alignItems: "center", justifyContent: "space-between",
                     }}
                   >
-                    <div>
-                      <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 14, color: isPast ? "var(--ink)" : "white" }}>
-                        {fmt(g.start_time)}
-                        <span style={{ color: isPast ? "var(--muted)" : "#888", fontWeight: 400 }}>
-                          {" – "}{new Date(g.end_time).toLocaleString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })}
-                        </span>
-                      </div>
-                      {g.label && <div style={{ fontSize: 11, color: isPast ? "var(--muted)" : "#888", marginTop: 2 }}>{g.label}</div>}
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{
-                        background: g.bookings.length > 0 ? "var(--red)" : "var(--border)",
-                        color: g.bookings.length > 0 ? "white" : "var(--muted)",
-                        fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 12,
-                        padding: "3px 10px", borderRadius: 100,
-                      }}>
-                        {g.bookings.length} / {g.capacity}
-                      </span>
-                      <span style={{ color: isPast ? "var(--muted)" : "#666", fontSize: 12 }}>{isOpen ? "▲" : "▼"}</span>
-                    </div>
+                    <SessionBookingHeader startTime={g.start_time} endTime={g.end_time} label={g.label} count={g.bookings.length} capacity={g.capacity} isOpen={isOpen} isPast={isPast} />
                   </div>
 
                   {isOpen && (

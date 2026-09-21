@@ -247,4 +247,52 @@ begin
 end;
 $$;
 
+-- Member attendance: names only, active bookings, deterministic signup order.
+insert into public.sessions (id, start_time, end_time, capacity, notes)
+values ('TEST-ATTENDANCE', now() + interval '5 hours', now() + interval '6 hours', 30, 'Attendance'),
+       ('TEST-PAST', now() - interval '2 hours', now() - interval '1 hour', 5, 'Past');
+insert into public.bookings (id, session_id, user_id, created_at, status, credit_charged)
+values
+  ('10000000-0000-0000-0000-000000000002', 'TEST-ATTENDANCE', '00000000-0000-0000-0000-000000000002', now(), 'active', false),
+  ('10000000-0000-0000-0000-000000000001', 'TEST-ATTENDANCE', '00000000-0000-0000-0000-000000000001', now(), 'active', false),
+  ('10000000-0000-0000-0000-000000000003', 'TEST-ATTENDANCE', '00000000-0000-0000-0000-000000000003', now() - interval '1 hour', 'cancelled', false);
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
+set local role authenticated;
+do $$
+begin
+  if (select names from public.list_upcoming_session_attendees() where session_id = 'TEST-ATTENDANCE')
+      is distinct from array['Admin', 'Member']::text[] then
+    raise exception 'Attendance must return active names in stable signup order';
+  end if;
+  if exists (select 1 from public.list_upcoming_session_attendees() where session_id = 'TEST-PAST') then
+    raise exception 'Past sessions must not be exposed';
+  end if;
+  if (select names from public.list_upcoming_session_attendees() where session_id = 'TEST-LOCKED')
+      is distinct from array[]::text[] then
+    raise exception 'Empty upcoming sessions must be included';
+  end if;
+  if has_function_privilege('anon', 'public.list_upcoming_session_attendees()', 'execute') then
+    raise exception 'Anonymous attendance access must be denied';
+  end if;
+  begin
+    perform public.admin_list_session_bookings_grouped();
+    raise exception 'Member unexpectedly accessed admin attendance';
+  exception when others then
+    if sqlerrm not like '%Not authorized%' then raise; end if;
+  end;
+end;
+$$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000099","role":"authenticated"}', true);
+do $$
+begin
+  begin
+    perform public.list_upcoming_session_attendees();
+    raise exception 'Non-member unexpectedly accessed attendance';
+  exception when others then
+    if sqlerrm not like '%Not authorized%' then raise; end if;
+  end;
+end;
+$$;
+reset role;
+
 rollback;

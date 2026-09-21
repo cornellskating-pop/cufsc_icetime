@@ -1,6 +1,6 @@
 # CUFSC Ice Time
 
-Booking and administration system for Cornell University Figure Skating Club ice sessions.
+Booking and administration system for Cornell University Figure Skating Club ice sessions. Members can use the dashboard’s Attendees tab to see upcoming sessions and signup-ordered names.
 
 ## Architecture
 

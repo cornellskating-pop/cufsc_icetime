@@ -1,6 +1,6 @@
 # CUFSC Ice Time — Technical Design
 
-Last reconciled with the application and migrations: September 13, 2026.
+Last reconciled with the application and migrations: September 21, 2026.
 
 ## System boundary
 
@@ -165,7 +165,7 @@ confirmation before invoking the checked RPC.
 - `authenticated` receives only required read grants and explicit RPC execution grants.
 - Browser writes occur through RPCs rather than direct table privileges.
 - Users can select only their own profile and bookings.
-- Admin RPCs protect member names, emails, credits, and attendance.
+- Admin RPCs protect emails, credits, and detailed attendance. Members may read upcoming session attendee names through the restricted RPC below.
 - Default privileges no longer automatically expose new tables or functions.
 
 RLS remains enabled on users, sessions, bookings, approvals, tiers, and the credit audit table.
@@ -226,3 +226,9 @@ Schema inspection dumps, including local `supabase/schema.sql`, are ignored. The
 - The login ID synchronization trigger lives under Auth-managed objects and is not represented by the public-schema dump.
 - The sender address must be verified in Resend before changing `FROM_EMAIL`.
 - Legacy Supabase API keys should be deactivated only after the frontend uses a publishable key and the Edge Function uses a secret backend key.
+
+## Member attendance
+
+The dashboard Attendees tab calls `list_upcoming_session_attendees()`. This fixed-search-path SECURITY DEFINER RPC requires an authenticated profile in `users`; anonymous callers and authenticated non-members cannot use it. It returns upcoming sessions (start time at or after now), including empty and unreleased sessions, sorted by start time and ID. Only active booking names are returned, ordered by signup time with booking ID as a deterministic tie-breaker. No attendee IDs, emails, tiers, or timestamps are exposed, and table RLS is unchanged.
+
+Native accordion headers share the admin date/time, notes label, and booking-count/capacity presentation. Names flow across five columns in blocks of at most 25; unused rows are omitted and additional blocks preserve all attendees for larger sessions. Cell measurements choose full name, last-name initial, then initials, recalculating after resizing and font loading. Full names remain accessible via labels and tooltips. Attendees reload on opening the tab and after the member’s booking/cancellation refresh. The existing admin table and permissions are preserved.

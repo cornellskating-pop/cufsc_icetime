@@ -215,3 +215,7 @@ If notification delivery fails, approval requests are still stored. Inspect:
 - Resend → Logs
 
 If a secret is exposed, revoke or replace it and inspect logs. Never commit a raw schema dump until its webhook headers have been reviewed and redacted.
+
+## Member attendance rollout
+
+Apply `20260921120000_add_member_session_attendees.sql` before deploying the frontend with the dashboard Attendees tab, following the authorized migration-list and dry-run checks above. No Edge Function changes are required. Verify a regular member can expand upcoming sessions, see only active attendee names in signup order, and see empty-session messaging. Check narrow and wide screens for five columns and name abbreviation. Verify admin attendance still includes its existing details. The SQL smoke test covers member/non-member access, anonymous grants, empty/past sessions, cancelled bookings, ordering ties, and continued admin isolation.

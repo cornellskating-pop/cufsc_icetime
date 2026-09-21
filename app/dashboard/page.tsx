@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
+import { SessionAttendees } from "../../lib/sessionAttendees";
 import { Loading, LogoMark, Msg, SpotBar } from "../../lib/ui";
 
 type Session = {
@@ -563,7 +564,7 @@ export default function Dashboard() {
   const [booking, setBooking] = useState(false);
   const [msg, setMsg] = useState("");
   const [msgType, setMsgType] = useState<"success" | "error" | "info">("info");
-  const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
+  const [viewMode, setViewMode] = useState<"calendar" | "list" | "attendees">("calendar");
   const [calendarMonth, setCalendarMonth] = useState<CalendarMonth>(getCurrentETMonth);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
@@ -845,10 +846,10 @@ export default function Dashboard() {
           <div className="card">
             <div className="card-header session-card-header">
               <span style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 14 }}>
-                {viewMode === "calendar" ? "Monthly Calendar" : "Session List"}
+                {viewMode === "calendar" ? "Monthly Calendar" : viewMode === "list" ? "Session List" : "Session Attendees"}
               </span>
               <div className="session-view-actions">
-                <span className="session-select-hint" style={{ fontSize: 12, color: MUTED }}>Select up to 2</span>
+                {viewMode !== "attendees" && <span className="session-select-hint" style={{ fontSize: 12, color: MUTED }}>Select up to 2</span>}
                 <div className="session-view-toggle" aria-label="Session view">
                   <button
                     type="button"
@@ -866,11 +867,14 @@ export default function Dashboard() {
                   >
                     List
                   </button>
+                  <button type="button" className={viewMode === "attendees" ? "active" : ""} aria-pressed={viewMode === "attendees"} onClick={() => setViewMode("attendees")}>Attendees</button>
                 </div>
               </div>
             </div>
 
-            {viewMode === "calendar" ? (
+            {viewMode === "attendees" ? (
+              <SessionAttendees nowMs={nowMs} bookings={myBookings} />
+            ) : viewMode === "calendar" ? (
               <CalendarView
                 sessions={sessions}
                 month={calendarMonth}
@@ -920,7 +924,7 @@ export default function Dashboard() {
               </>
             )}
 
-            <div style={{ padding: "14px 20px", background: CREAM, borderTop: `1px solid ${BORDER}` }}>
+            {viewMode !== "attendees" && <div style={{ padding: "14px 20px", background: CREAM, borderTop: `1px solid ${BORDER}` }}>
               {msg && <Msg text={msg} type={msgType} />}
               <button
                 className="btn-primary"
@@ -937,7 +941,7 @@ export default function Dashboard() {
               >
                 {booking ? "Booking…" : `Book Selected (${selected.length}/2)`}
               </button>
-            </div>
+            </div>}
           </div>
         </div>
 
