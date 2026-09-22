@@ -17,6 +17,8 @@ type Row = {
 const EMPTY_FORM = { id: "", label: "", start_time: "", end_time: "", release_at: "", capacity: 25 };
 
 export default function AdminSessions() {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [cancelling, setCancelling] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editing, setEditing] = useState(false);
@@ -41,6 +43,11 @@ export default function AdminSessions() {
       }
       setRows((data || []) as Row[]);
     });
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const sortedRows = useMemo(
@@ -103,6 +110,20 @@ export default function AdminSessions() {
     setMsg(`Session saved: ${data}`); setMsgType("success");
     setForm(EMPTY_FORM); setEditing(false); setShowForm(false);
     load();
+  };
+
+  const cancelSession = async (row: Row) => {
+    const when = new Date(row.start_time).toLocaleString("en-US", { timeZone: "America/New_York" });
+    if (!window.confirm(`Cancel the entire session ${row.label || row.id} (${when} ET)? All active bookings will be cancelled, charged credits refunded, and booked members emailed. Pending requests will be closed. This cannot be reopened.`)) return;
+    setCancelling(row.id);
+    const { data, error } = await supabase.rpc("admin_cancel_session", { p_session_id: row.id });
+    setCancelling(null);
+    setMsg(error ? error.message : String(data));
+    setMsgType(error ? "error" : "success");
+    if (!error) {
+      if (form.id === row.id) { setShowForm(false); setEditing(false); setForm(EMPTY_FORM); }
+      await load();
+    }
   };
 
   const f = (k: keyof typeof EMPTY_FORM) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -218,7 +239,8 @@ export default function AdminSessions() {
                       </td>
                       <td>
                         <div style={{ display: "flex", gap: 8 }}>
-                          <button className="btn-link" onClick={() => edit(r)}>Edit</button>
+                          <button className="btn-link" disabled={r.label?.startsWith("Cancelled: ")} onClick={() => edit(r)}>Edit</button>
+                          {!r.label?.startsWith("Cancelled: ") && new Date(r.end_time).getTime() > nowMs && <button className="btn-link" style={{ color: "var(--red)" }} disabled={cancelling !== null} onClick={() => void cancelSession(r)}>{cancelling === r.id ? "Cancelling…" : "Cancel Session"}</button>}
                           <button className="btn-link" style={{ color: "var(--red)" }} onClick={() => setDeleteTarget(r)}>Delete</button>
                         </div>
                       </td>

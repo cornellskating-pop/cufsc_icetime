@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
+import { formatCountdownAmount, freeBookingIndicator } from "../../lib/bookingTime";
 import { SessionAttendees } from "../../lib/sessionAttendees";
 import { Loading, LogoMark, Msg, SpotBar } from "../../lib/ui";
 
@@ -14,6 +15,7 @@ type Session = {
   label?: string | null;
   notes?: string | null;
   spots_left: number;
+  cancelled_at?: string | null;
 };
 
 type MyBooking = {
@@ -103,16 +105,6 @@ function formatCalendarTime(value: string) {
   });
 }
 
-function formatCountdownAmount(remainingMs: number) {
-  if (remainingMs >= 48 * 60 * 60 * 1000) {
-    return `${Math.ceil(remainingMs / (24 * 60 * 60 * 1000))}d`;
-  }
-  if (remainingMs >= 60 * 60 * 1000) {
-    return `${Math.ceil(remainingMs / (60 * 60 * 1000))}h`;
-  }
-  return `${Math.max(1, Math.ceil(remainingMs / (60 * 1000)))}m`;
-}
-
 function formatAvailabilityCountdown(releaseAt: string | null, nowMs: number) {
   if (!releaseAt) return null;
 
@@ -198,6 +190,7 @@ function getSessionStatus(
   s: Session,
   now = new Date()
 ): { status: SessionStatus; badgeLabel: string; subtext?: string } {
+  if (s.cancelled_at) return { status: "closed", badgeLabel: "Cancelled" };
   const start = new Date(s.start_time);
   const end = new Date(s.end_time);
   const release = s.release_at ? new Date(s.release_at) : null;
@@ -369,6 +362,7 @@ function SessionRow({
             })}
           </span>
         </div>
+        {freeBookingIndicator(s, nowMs) && <div className="free-booking-indicator">{freeBookingIndicator(s, nowMs)}</div>}
         <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>
           {s.spots_left} spot{s.spots_left !== 1 ? "s" : ""} left
           {subtext && <span style={{ color: "#854D0E", marginLeft: 6 }}>· {subtext}</span>}
@@ -485,7 +479,7 @@ function CalendarView({
                 <div className="calendar-day-number">{day.day}</div>
                 <div className="calendar-day-sessions">
                   {daySessions.map((session) => {
-                    const { status } = getSessionStatus(session, new Date(nowMs));
+                    const { status, badgeLabel } = getSessionStatus(session, new Date(nowMs));
                     const checked = selected.includes(session.id);
                     const booked = bookedSessionIds.has(session.id);
                     const showSession = isShowSession(session);
@@ -505,7 +499,7 @@ function CalendarView({
                         : status === "ended"
                           ? "Ended"
                           : status === "closed"
-                            ? "Closed"
+                            ? badgeLabel
                             : `${session.spots_left} left`;
                     const timeline = getSessionTimeline(
                       session,
@@ -535,6 +529,7 @@ function CalendarView({
                               : showSession && <span className="calendar-show-label">Show</span>}
                             {formatCalendarTime(session.start_time)}
                           </span>
+                          {freeBookingIndicator(session, nowMs) && <span className="free-booking-indicator">{freeBookingIndicator(session, nowMs)}</span>}
                           <span className="calendar-session-status timeline-primary">{timeline.primary}</span>
                           {timeline.secondary && (
                             <span className="calendar-session-meta">{timeline.secondary}</span>
@@ -816,6 +811,8 @@ export default function Dashboard() {
             </div>
           </div>
 
+          <section className="booking-rules-panel" aria-labelledby="booking-rules-heading">
+          <h2 id="booking-rules-heading">Read before booking</h2>
           <ul className="booking-rules">
             <li>One session per credit.</li>
             <li>You can select and book up to two sessions at a time.</li>
@@ -826,6 +823,7 @@ export default function Dashboard() {
             </li>
             <li>Booking closes at the session start; cancellation closes 30 minutes after start.</li>
           </ul>
+          </section>
         </div>
       </div>
 
@@ -1103,6 +1101,10 @@ export default function Dashboard() {
           align-items: center;
           gap: 12px;
         }
+        .booking-rules-panel { background: #FFF3CD; border: 2px solid #D6A52B; border-left-width: 6px; border-radius: 12px; padding: 18px 20px; color: #513C0B; }
+        .booking-rules-panel h2 { margin: 0 0 12px; font-size: 18px; font-weight: 800; text-decoration: underline; text-underline-offset: 4px; }
+        .free-booking-indicator { display: block; margin-top: 4px; font-size: 11px; font-weight: 700; color: #17624A; }
+        .calendar-session-block .free-booking-indicator { font-size: 8px; line-height: 1.25; white-space: normal; }
         .booking-rules {
           min-width: 0;
           margin: 0;
@@ -1110,9 +1112,9 @@ export default function Dashboard() {
           display: flex;
           flex-direction: column;
           gap: 6px;
-          color: ${MUTED};
-          font-size: 10.5px;
-          line-height: 1.35;
+          color: #513C0B;
+          font-size: 13px;
+          line-height: 1.5;
         }
         .booking-rules li::marker {
           color: ${RED};
@@ -1658,7 +1660,7 @@ export default function Dashboard() {
           .dashboard-title { white-space: normal; }
           .booking-rules {
             gap: 5px;
-            font-size: 10.5px;
+            font-size: 12px;
           }
           .dashboard-nav-email { display: none; }
           .dashboard-nav-actions { gap: 7px !important; }

@@ -38,6 +38,7 @@ type GroupedBookingRow = {
 };
 
 export default function AdminBookings() {
+  const [removing, setRemoving] = useState<string | null>(null);
   const [groups, setGroups] = useState<SessionGroup[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [msg, setMsg] = useState("");
@@ -80,6 +81,22 @@ export default function AdminBookings() {
       setExpanded(new Set(upcoming.map(s => s.id)));
     });
   }, []);
+
+  const removeBooking = async (entry: BookingEntry, group: SessionGroup) => {
+    if (!window.confirm(`Remove ${entry.name || "this member"} from ${new Date(group.start_time).toLocaleString("en-US", { timeZone: "America/New_York" })} ET? Any charged credit will be refunded, and a removal email will be sent.`)) return;
+    setRemoving(entry.booking_id);
+    try {
+      const { data, error } = await supabase.rpc("admin_remove_booking", { p_booking_id: entry.booking_id });
+      if (error) throw error;
+      setGroups(current => current.map(item => item.session_id === group.session_id
+        ? { ...item, bookings: item.bookings.filter(booking => booking.booking_id !== entry.booking_id) } : item));
+      setMsg(String(data));
+      setMsgType("success");
+    } catch {
+      setMsg("Unable to remove this booking. Please try again.");
+      setMsgType("error");
+    } finally { setRemoving(null); }
+  };
 
   const toggle = (id: string) =>
     setExpanded(prev => {
@@ -142,6 +159,7 @@ export default function AdminBookings() {
                             <th>Email</th>
                             <th>Tier</th>
                             <th>Signed Up</th>
+                            <th>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -160,6 +178,7 @@ export default function AdminBookings() {
                                 </span>
                               </td>
                               <td style={{ color: "var(--muted)", fontSize: 12 }}>{fmtShort(b.created_at)}</td>
+                              <td>{!isPast && <button className="btn-danger" disabled={removing !== null} onClick={() => void removeBooking(b, g)}>{removing === b.booking_id ? "Removing…" : "Remove"}</button>}</td>
                             </tr>
                           ))}
                         </tbody>

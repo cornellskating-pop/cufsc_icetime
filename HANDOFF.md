@@ -219,3 +219,19 @@ If a secret is exposed, revoke or replace it and inspect logs. Never commit a ra
 ## Member attendance rollout
 
 Apply `20260921120000_add_member_session_attendees.sql` before deploying the frontend with the dashboard Attendees tab, following the authorized migration-list and dry-run checks above. No Edge Function changes are required. Verify a regular member can expand upcoming sessions, see only active attendee names in signup order, and see empty-session messaging. Check narrow and wide screens for five columns and name abbreviation. Verify admin attendance still includes its existing details. The SQL smoke test covers member/non-member access, anonymous grants, empty/past sessions, cancelled bookings, ordering ties, and continued admin isolation.
+
+## Contingency and removal rollout
+
+Deploy the backward-compatible `notify-admins` Edge Function first, then apply `20260921130000_add_admin_booking_removal.sql` and `20260921140000_add_one_credit_contingency.sql`, then deploy the frontend. Follow the migration-list/dry-run and authorization requirements above. Neither applying these migrations nor deploying the UI removes bookings, changes balances, or sends member emails by itself.
+
+In Admin Tools, **One-credit contingency** replaces remaining balances immediately (1 for non-temporary accounts including admins, 0 for temporary accounts). The confirmation explains repeat runs, existing bookings, and refunds. The next normal weekly reset restores tier allowances. In Admin Bookings, **Remove** confirms the member and session, cancels the booking, refunds any charged credit, and queues the notification. Ended sessions cannot be changed with this action.
+
+Check removal notifications in `booking_removal_notifications` through trusted backend access; `sent_at is null` means delivery has not been confirmed. Investigate pg_net, Edge Function, and Resend failures before replaying the authenticated webhook with the same notification ID. Do not create another notification record to retry. The provider's idempotency protection is time-limited; check delivery history before retrying old uncertain deliveries. Avoid printing recipient data or webhook secrets in logs. No automatic retry schedule is installed.
+
+Verify a non-admin cannot invoke either admin operation, a removed charged booking refunds only once, a free booking never refunds, the member receives the correct session/refund email, and no email goes to the club/admin override address. Verify the contingency keeps tiers/bookings intact and the next regular reset uses tier allowances. Check the rules panel and no-credit labels at narrow and wide widths.
+
+## Entire-session cancellation
+
+Admin Sessions includes **Cancel Session**, with a confirmation naming the session. It cancels all active bookings, refunds only charged credits, and emails each booked member that the whole session was cancelled. Each email has a unique notification ID in `booking_removal_notifications`. Existing cancelled bookings are unaffected, and repeated cancellation does not duplicate refunds or notifications. Pending approval requests are denied. The session remains visible as Cancelled with zero capacity and cannot be edited or reopened; this is distinct from permanent deletion.
+
+For rollout, deploy the updated notification worker, apply the earlier removal/contingency migrations followed by `20260922120000_add_session_cancellation.sql`, then deploy the frontend. Cancellation itself requires an admin to confirm the action; deployment does not cancel any sessions. Notification IDs and delivery status are backend-only. Verify cancellation with both charged and free bookings and confirm the member emails. Concurrent updates can return a retry message; retry the entire cancellation, which is atomic.

@@ -295,4 +295,126 @@ end;
 $$;
 reset role;
 
+-- Admin removal and contingency authorization under the actual browser role.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
+set local role authenticated;
+do $$
+begin
+  begin
+    perform public.admin_one_credit_contingency();
+    raise exception 'Member unexpectedly reset credits';
+  exception when others then
+    if sqlerrm not like '%Not authorized%' then raise; end if;
+  end;
+  begin
+    perform public.admin_remove_booking('10000000-0000-0000-0000-000000000002');
+    raise exception 'Member unexpectedly removed a booking';
+  exception when others then
+    if sqlerrm not like '%Not authorized%' then raise; end if;
+  end;
+  if has_table_privilege('authenticated', 'public.booking_removal_notifications', 'select') then
+    raise exception 'Browser must not read notification records';
+  end if;
+  if has_function_privilege('anon', 'public.admin_one_credit_contingency()', 'execute')
+     or has_function_privilege('anon', 'public.admin_remove_booking(uuid)', 'execute') then
+    raise exception 'Anonymous admin RPC access';
+  end if;
+end;
+$$;
+reset role;
+update public.users set tier = 'basic', credits_balance = 4 where id = '00000000-0000-0000-0000-000000000002';
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+set local role authenticated;
+select public.admin_one_credit_contingency();
+reset role;
+do $$
+begin
+  if exists (select 1 from public.users where credits_balance <> case when lower(tier) = 'temp' then 0 else 1 end) then
+    raise exception 'Contingency balances incorrect';
+  end if;
+  if (select count(*) from public.credit_audit where action = 'CONTINGENCY_RESET') <> 3 then
+    raise exception 'Contingency must be audited for every account';
+  end if;
+  if (select tier from public.users where id = '00000000-0000-0000-0000-000000000002') <> 'basic' then
+    raise exception 'Contingency changed a tier';
+  end if;
+end;
+$$;
+select public.admin_remove_booking((select id from public.bookings where session_id = 'TEST-NORMAL'));
+select public.admin_remove_booking((select id from public.bookings where session_id = 'TEST-NORMAL'));
+select public.admin_remove_booking('10000000-0000-0000-0000-000000000002');
+do $$
+begin
+  if (select credits_balance from public.users where id = '00000000-0000-0000-0000-000000000002') <> 2 then
+    raise exception 'Charged booking should refund exactly once and free booking never refund';
+  end if;
+  if (select count(*) from public.booking_removal_notifications) <> 2 then
+    raise exception 'One removal notification required per removed booking';
+  end if;
+  if (select count(*) from public.booking_removal_notifications where refunded) <> 1 then
+    raise exception 'Notification refund details incorrect';
+  end if;
+  if exists (select 1 from public.bookings where session_id = 'TEST-NORMAL' and status = 'active') then
+    raise exception 'Removed booking still occupies a spot';
+  end if;
+end;
+$$;
+select public.admin_weekly_reset_credits();
+do $$
+begin
+  if exists (select 1 from public.users u join public.tiers t on lower(t.name) = lower(u.tier)
+    where u.credits_balance <> t.weekly_credits) then
+    raise exception 'Normal tier resets must resume after contingency';
+  end if;
+end;
+$$;
+
+-- Entire-session cancellation keeps history, closes booking, refunds once.
+insert into public.sessions (id, start_time, end_time, capacity)
+values ('TEST-CANCEL-SESSION', now() + interval '4 hours', now() + interval '5 hours', 10);
+insert into public.bookings (id, session_id, user_id, credit_charged) values
+('20000000-0000-0000-0000-000000000001', 'TEST-CANCEL-SESSION', '00000000-0000-0000-0000-000000000001', true),
+('20000000-0000-0000-0000-000000000002', 'TEST-CANCEL-SESSION', '00000000-0000-0000-0000-000000000002', false);
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
+set local role authenticated;
+do $$ begin
+  begin
+    perform public.admin_cancel_session('TEST-CANCEL-SESSION');
+    raise exception 'Non-admin cancelled session';
+  exception when others then
+    if sqlerrm not like '%Not authorized%' then raise; end if;
+  end;
+end; $$;
+reset role;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select public.admin_cancel_session('TEST-CANCEL-SESSION');
+select public.admin_cancel_session('TEST-CANCEL-SESSION');
+do $$ begin
+  if not exists (select 1 from public.sessions where id = 'TEST-CANCEL-SESSION' and capacity = 0 and cancelled_at is not null) then
+    raise exception 'Cancelled session must remain closed in history';
+  end if;
+  if exists (select 1 from public.bookings where session_id = 'TEST-CANCEL-SESSION' and status = 'active') then
+    raise exception 'Cancelled session retains active bookings';
+  end if;
+  if (select count(*) from public.booking_removal_notifications where reason = 'session_cancelled') <> 2 then
+    raise exception 'Expected one notification per active member';
+  end if;
+  if (select credits_balance from public.users where id = '00000000-0000-0000-0000-000000000001') <> 3
+    or (select credits_balance from public.users where id = '00000000-0000-0000-0000-000000000002') <> 2 then
+    raise exception 'Incorrect or repeated session cancellation refund';
+  end if;
+  if public.book_sessions(array['TEST-CANCEL-SESSION']) #>> '{0,ok}' <> 'false' then
+    raise exception 'Cancelled session accepted a booking';
+  end if;
+  begin
+    update public.sessions set capacity = 10 where id = 'TEST-CANCEL-SESSION';
+    raise exception 'Cancelled session reopened';
+  exception when others then
+    if sqlerrm not like '%cannot be edited%' then raise; end if;
+  end;
+  if has_function_privilege('anon', 'public.admin_cancel_session(text)', 'execute') then
+    raise exception 'Anonymous session cancellation access';
+  end if;
+end; $$;
+
 rollback;

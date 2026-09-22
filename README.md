@@ -8,7 +8,7 @@ Booking and administration system for Cornell University Figure Skating Club ice
 - Supabase Auth handles Google OAuth.
 - Supabase Postgres stores members, tiers, sessions, bookings, approvals, and the credit audit log.
 - PostgreSQL RPC functions are the authoritative business-logic and authorization boundary.
-- A Supabase Edge Function sends new-request alerts and account/session approval confirmations through Resend.
+- A Supabase Edge Function sends new-request alerts, account/session approval confirmations, and admin booking-removal emails through Resend.
 - Vercel hosts the frontend at `https://cufscice.vercel.app`.
 
 Project guides:
@@ -58,6 +58,8 @@ npx supabase stop
 
 Add `http://localhost:3000/auth/callback` to the Supabase Auth redirect allowlist before testing local Google login.
 
+Admins can remove individual bookings with credit refunds and email notifications. Admin Tools also includes an immediate one-credit contingency reset; temporary accounts receive zero, and the next weekly reset restores normal tier allowances. The dashboard highlights booking rules and shows the countdown to no-credit booking in calendar and list views.
+
 ## Database workflow
 
 The committed files under `supabase/migrations/` are the source of truth. Do not edit production functions or policies directly in the Dashboard. Create and test a migration locally, review `supabase db push --dry-run`, and only then apply it to the linked project.
@@ -69,3 +71,7 @@ The local schema-only inspection dump at `supabase/schema.sql` is intentionally 
 Start with [CONTRIBUTING.md](./CONTRIBUTING.md), whether you are editing the project manually or with an AI coding assistant. It explains which files to change, required checks, database and Edge Function workflows, deployment authorization, and the documentation that must remain synchronized.
 
 AI tools should read [AGENTS.md](./AGENTS.md) before making changes. Always review AI-generated code and migrations before committing or deploying them.
+
+## Entire-session cancellation
+
+Admin Sessions includes **Cancel Session**, with a confirmation naming the session. It cancels all active bookings, refunds only charged credits, and emails each booked member that the whole session was cancelled. Each email has a unique notification ID in `booking_removal_notifications`. Existing cancelled bookings are unaffected, and repeated cancellation does not duplicate refunds or notifications. Pending approval requests are denied. The session remains visible as Cancelled with zero capacity and cannot be edited or reopened; this is distinct from permanent deletion.

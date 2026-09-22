@@ -10,6 +10,7 @@ type ApprovalRecord = {
 };
 
 type WebhookPayload = {
+  table?: string;
   type?: "INSERT" | "UPDATE";
   record?: { id?: unknown };
 };
@@ -67,12 +68,13 @@ const formatSessionTime = (startTime: string, endTime: string) => {
   return `${date}, ${timeFormatter.format(start)}–${timeFormatter.format(end)} ET`;
 };
 
-const sendEmail = async (to: string[], subject: string, body: string) => {
+const sendEmail = async (to: string[], subject: string, body: string, idempotencyKey?: string) => {
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${RESEND_API_KEY}`,
       "Content-Type": "application/json",
+      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
     },
     body: JSON.stringify({
       from: FROM_EMAIL,
@@ -105,6 +107,30 @@ Deno.serve(async (req) => {
     }
 
     const supabase = createClient(SUPABASE_URL, BACKEND_SECRET_KEY);
+
+    if (payload.table === "booking_removal_notifications") {
+      const { data: notice, error } = await supabase.from("booking_removal_notifications")
+        .select("id, recipient_email, member_name, start_time, end_time, refunded, sent_at, reason")
+        .eq("id", approvalId).single();
+      if (error || !notice) throw new Error("Removal notification not found");
+      if (notice.sent_at) return new Response("Already sent", { status: 200 });
+      const recipients = validUniqueEmails([notice.recipient_email]);
+      if (!recipients.length) throw new Error("Removal notification has no valid recipient");
+      await sendEmail(recipients, notice.reason === "session_cancelled" ? "Your CUFSC ice session was cancelled" : "Your CUFSC ice booking was removed",
+        `Hi${notice.member_name ? ` ${notice.member_name}` : ""},
+
+${notice.reason === "session_cancelled" ? "The following CUFSC ice session has been cancelled. Your booking has been cancelled as well:" : "An administrator has removed your booking for this CUFSC ice session:"}
+${formatSessionTime(notice.start_time, notice.end_time)}
+
+${notice.refunded ? "The credit used for this booking has been returned to your balance." : "This booking did not use a credit, so no credit refund was needed."}
+
+If you have questions, please contact ${CLUB_NOTIFICATION_EMAIL}.
+View your bookings: ${APP_URL}/dashboard`, `booking-removal/${notice.id}`);
+      const { error: updateError } = await supabase.from("booking_removal_notifications")
+        .update({ sent_at: new Date().toISOString() }).eq("id", notice.id);
+      if (updateError) throw new Error("Could not mark removal notification sent");
+      return new Response("OK", { status: 200 });
+    }
 
     const { data: row, error: requestError } = await supabase
       .from("approval_requests")
