@@ -1101,7 +1101,7 @@ export default function Dashboard() {
           align-items: center;
           gap: 12px;
         }
-        .booking-rules-panel { background: #FFF3CD; border: 2px solid #D6A52B; border-left-width: 6px; border-radius: 12px; padding: 18px 20px; color: #513C0B; }
+        .booking-rules-panel { background: rgba(207, 47, 47, .06); border: 2px solid rgba(207, 47, 47, .22); border-left-width: 6px; border-radius: 12px; padding: 18px 20px; color: ${RED}; }
         .booking-rules-panel h2 { margin: 0 0 12px; font-size: 18px; font-weight: 800; text-decoration: underline; text-underline-offset: 4px; }
         .free-booking-indicator { display: block; margin-top: 4px; font-size: 11px; font-weight: 700; color: #17624A; }
         .calendar-session-block .free-booking-indicator { font-size: 8px; line-height: 1.25; white-space: normal; }
@@ -1112,7 +1112,7 @@ export default function Dashboard() {
           display: flex;
           flex-direction: column;
           gap: 6px;
-          color: #513C0B;
+          color: ${INK};
           font-size: 13px;
           line-height: 1.5;
         }

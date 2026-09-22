@@ -241,7 +241,7 @@ Native accordion headers share the admin date/time, notes label, and booking-cou
 
 The insert webhook uses the existing Vault secret and `notify-admins` worker. The worker reloads the notification by ID, sends only to its authoritative recipient with a per-notification Resend idempotency key, and records `sent_at` after success. Already-sent records are skipped. Delivery is asynchronous; failures remain pending and require operator review/retry, as with approval notifications. This event does not run for member self-cancellation.
 
-The dashboard uses a yellow bordered rules panel with a bold, underlined heading. Both calendar and list views show the time until the later of release time and 60 minutes before start, then indicate the no-credit window (including a full-session state). Zero-capacity and started sessions have no no-credit indicator. These labels do not override RPC authorization or the temporary-account approval requirement.
+The dashboard uses a rules panel matching the Venmo pill’s red tint and border color with a bold, underlined heading. Both calendar and list views show the time until the later of release time and 60 minutes before start, then indicate the no-credit window (including a full-session state). Zero-capacity and started sessions have no no-credit indicator. These labels do not override RPC authorization or the temporary-account approval requirement.
 
 ## Entire-session cancellation
 
