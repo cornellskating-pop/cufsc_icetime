@@ -14,9 +14,17 @@ type Row = {
   spots_left?: number;
 };
 
+type RestorePreview = { eligible: boolean; deadline: string; capacity: number | null; bookings: number; refunded_credits: number };
+
 const EMPTY_FORM = { id: "", label: "", start_time: "", end_time: "", release_at: "", capacity: 25 };
 
 export default function AdminSessions() {
+  const [restoreTarget, setRestoreTarget] = useState<Row | null>(null);
+  const [restorePreview, setRestorePreview] = useState<RestorePreview | null>(null);
+  const [restoreBookings, setRestoreBookings] = useState(false);
+  const [restoreCapacity, setRestoreCapacity] = useState("");
+  const [restoreBusy, setRestoreBusy] = useState(false);
+  const [restoreError, setRestoreError] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
@@ -124,6 +132,33 @@ export default function AdminSessions() {
       if (form.id === row.id) { setShowForm(false); setEditing(false); setForm(EMPTY_FORM); }
       await load();
     }
+  };
+
+  const openRestore = async (row: Row) => {
+    setRestoreTarget(row); setRestorePreview(null); setRestoreError(""); setRestoreBookings(false); setRestoreCapacity(""); setRestoreBusy(true);
+    try {
+      const { data, error } = await supabase.rpc("admin_session_restore_preview", { p_session_id: row.id });
+      if (error) throw error;
+      const preview = data as RestorePreview;
+      setRestorePreview(preview);
+      setRestoreCapacity(preview.capacity === null ? "" : String(preview.capacity));
+    } catch { setRestoreError("Could not load restoration details. Close this dialog and try again."); }
+    finally { setRestoreBusy(false); }
+  };
+
+  const restoreSession = async () => {
+    if (!restoreTarget || !restorePreview) return;
+    setRestoreBusy(true); setRestoreError("");
+    try {
+      const capacity = Number(restoreCapacity);
+      if (!restoreCapacity.trim() || !Number.isInteger(capacity) || capacity < 0) throw new Error("Enter a valid original capacity.");
+      const { data, error } = await supabase.rpc("admin_restore_session", {
+        p_session_id: restoreTarget.id, p_restore_bookings: restoreBookings, p_capacity: capacity,
+      });
+      if (error) throw error;
+      setRestoreTarget(null); setMsg(String(data)); setMsgType("success"); await load();
+    } catch (error) { setRestoreError(error instanceof Error ? error.message : (error as { message?: string }).message || "Restoration failed. Please try again."); }
+    finally { setRestoreBusy(false); }
   };
 
   const f = (k: keyof typeof EMPTY_FORM) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -239,6 +274,7 @@ export default function AdminSessions() {
                       </td>
                       <td>
                         <div style={{ display: "flex", gap: 8 }}>
+                          {r.label?.startsWith("Cancelled: ") && <button className="btn-link" onClick={() => void openRestore(r)}>Restore Session</button>}
                           <button className="btn-link" disabled={r.label?.startsWith("Cancelled: ")} onClick={() => edit(r)}>Edit</button>
                           {!r.label?.startsWith("Cancelled: ") && new Date(r.end_time).getTime() > nowMs && <button className="btn-link" style={{ color: "var(--red)" }} disabled={cancelling !== null} onClick={() => void cancelSession(r)}>{cancelling === r.id ? "Cancelling…" : "Cancel Session"}</button>}
                           <button className="btn-link" style={{ color: "var(--red)" }} onClick={() => setDeleteTarget(r)}>Delete</button>
@@ -286,6 +322,35 @@ export default function AdminSessions() {
         text-align: center;
       }
     `}</style>
+
+    {restoreTarget && (
+      <div role="dialog" aria-modal="true" aria-labelledby="restore-title" onKeyDown={event => { if (event.key === "Escape" && !restoreBusy) setRestoreTarget(null); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+        <div className="card" style={{ padding: 24, maxWidth: 520, width: "100%" }}>
+          <h2 id="restore-title" style={{ fontSize: 20 }}>Restore Session</h2>
+          <p>{restoreTarget.label || restoreTarget.id}</p>
+          <p style={{ fontSize: 13 }}>{new Date(restoreTarget.start_time).toLocaleString("en-US", { timeZone: "America/New_York" })} ET</p>
+          {restoreBusy && !restorePreview && <p role="status">Loading restoration details…</p>}
+          {restorePreview && <>
+            <p style={{ fontSize: 13 }}>Available until {new Date(restorePreview.deadline).toLocaleString("en-US", { timeZone: "America/New_York" })} ET, and only before the session starts.</p>
+            {!restorePreview.eligible ? <p>This session is outside the restoration window.</p> : <>
+              <fieldset disabled={restoreBusy} style={{ border: 0, padding: 0 }}>
+                <legend style={{ fontWeight: 700, marginBottom: 12 }}>Choose what to restore</legend>
+                <label style={{ display: "block", marginBottom: 12 }}><input autoFocus type="radio" name="restore-mode" checked={!restoreBookings} onChange={() => setRestoreBookings(false)} /> Reopen empty — keep refunds and let members book again</label>
+                <label style={{ display: "block", marginBottom: 12 }}><input type="radio" name="restore-mode" checked={restoreBookings} onChange={() => setRestoreBookings(true)} /> Restore previous bookings and pending requests</label>
+                <p style={{ fontSize: 13 }}>{restorePreview.bookings} logged booking(s); {restorePreview.refunded_credits} refunded credit(s). Restoring bookings deducts those refunds again. If a member has already spent the refunded credit, nothing changes and you’ll see an error.</p>
+                <label>Original capacity<input className="input" type="number" min="0" step="1" value={restoreCapacity} disabled={restorePreview.capacity !== null} onChange={event => setRestoreCapacity(event.target.value)} /></label>
+                {restorePreview.capacity === null && <p style={{ fontSize: 12 }}>This older cancellation did not record capacity. Confirm the original capacity before restoring.</p>}
+              </fieldset>
+            </>}
+          </>}
+          {restoreError && <p role="alert" style={{ color: "var(--red)" }}>{restoreError}</p>}
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 16 }}>
+            <button className="btn-ghost" disabled={restoreBusy} onClick={() => setRestoreTarget(null)}>Close</button>
+            <button className="btn-primary" disabled={restoreBusy || !restorePreview?.eligible || !restoreCapacity.trim()} onClick={() => void restoreSession()}>{restoreBusy ? "Working…" : restoreBookings ? "Restore session and bookings" : "Reopen empty"}</button>
+          </div>
+        </div>
+      </div>
+    )}
 
     {deleteTarget && (
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100,

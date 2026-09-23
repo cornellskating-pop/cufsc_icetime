@@ -136,3 +136,7 @@ Historical migrations are records of what was applied; do not rewrite them to ma
 ## Commit and review
 
 Keep commits focused and use an imperative summary such as `Notify users when access is approved`. Never commit `.env*`, local dumps, backups, build output, or credentials. Confirm `git status` contains only intended files before committing and pushing.
+
+## Known local migration replay prerequisite
+
+A clean reset currently stops at `20260904120000_move_fall_session_releases_to_sunday_evening.sql`: its historical assertion expects 46 rows while replay creates 48. The subsequent account conversion also requires the zero-credit `temp` tier before seed execution. Do not edit applied migrations to work around these issues. Restoration regression checks were run on an isolated local database with a temporary copy accepting 48 rows and synthetic `temp`/`basic` tier prerequisites, followed by the remaining unchanged migrations and `hardening_smoke.sql`. This is not a production migration procedure; a standard reset remains blocked until a separate replay fix is made.

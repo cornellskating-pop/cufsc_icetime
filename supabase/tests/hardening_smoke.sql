@@ -410,10 +410,80 @@ do $$ begin
     update public.sessions set capacity = 10 where id = 'TEST-CANCEL-SESSION';
     raise exception 'Cancelled session reopened';
   exception when others then
-    if sqlerrm not like '%cannot be edited%' then raise; end if;
+    if sqlerrm not like '%Use Restore Session%' then raise; end if;
   end;
   if has_function_privilege('anon', 'public.admin_cancel_session(text)', 'execute') then
     raise exception 'Anonymous session cancellation access';
+  end if;
+end; $$;
+
+-- Restoration previews and both popup choices.
+do $$ declare preview jsonb; begin
+  preview := public.admin_session_restore_preview('TEST-CANCEL-SESSION');
+  if (preview->>'capacity')::integer <> 10 or (preview->>'bookings')::integer <> 2 then
+    raise exception 'Restoration snapshot or booking log preview incorrect';
+  end if;
+end; $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
+set local role authenticated;
+do $$ begin
+  begin
+    perform public.admin_restore_session('TEST-CANCEL-SESSION', true);
+    raise exception 'Member restored a session';
+  exception when others then if sqlerrm not like '%Not authorized%' then raise; end if; end;
+end; $$;
+reset role;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+update public.users set credits_balance = 0 where id = '00000000-0000-0000-0000-000000000001';
+do $$ begin
+  begin
+    perform public.admin_restore_session('TEST-CANCEL-SESSION', true);
+    raise exception 'Restored despite spent refund';
+  exception when others then if sqlerrm not like '%already used the refunded credit%' then raise; end if; end;
+  if exists (select 1 from public.bookings where session_id = 'TEST-CANCEL-SESSION' and status = 'active') then
+    raise exception 'Failed restoration made partial changes';
+  end if;
+end; $$;
+update public.users set credits_balance = 3 where id = '00000000-0000-0000-0000-000000000001';
+select public.admin_restore_session('TEST-CANCEL-SESSION', true);
+select public.admin_restore_session('TEST-CANCEL-SESSION', true);
+do $$ begin
+  if (select count(*) from public.bookings where session_id = 'TEST-CANCEL-SESSION' and status = 'active') <> 2 then
+    raise exception 'Expected exactly two restored bookings';
+  end if;
+  if (select credits_balance from public.users where id = '00000000-0000-0000-0000-000000000001') <> 2 then
+    raise exception 'Refund reversal must occur exactly once';
+  end if;
+  if exists (select 1 from public.booking_removal_notifications where session_id = 'TEST-CANCEL-SESSION' and superseded_at is null) then
+    raise exception 'Outdated cancellation notices must be suppressed';
+  end if;
+end; $$;
+insert into public.sessions (id, start_time, end_time, capacity, notes)
+values ('TEST-RESTORE-EMPTY', now() + interval '5 hours', now() + interval '6 hours', 17, 'Original label');
+select public.admin_cancel_session('TEST-RESTORE-EMPTY');
+-- Simulate a cancellation made before snapshots were installed.
+delete from private.session_cancellation_snapshots where session_id = 'TEST-RESTORE-EMPTY';
+do $$ begin
+  begin
+    perform public.admin_restore_session('TEST-RESTORE-EMPTY', false);
+    raise exception 'Legacy restoration guessed capacity';
+  exception when others then if sqlerrm not like '%Confirm the original capacity%' then raise; end if; end;
+end; $$;
+select public.admin_restore_session('TEST-RESTORE-EMPTY', false, 17);
+do $$ begin
+  if not exists (select 1 from public.sessions where id = 'TEST-RESTORE-EMPTY' and capacity = 17 and notes = 'Original label' and cancelled_at is null) then
+    raise exception 'Legacy empty restoration failed';
+  end if;
+end; $$;
+insert into public.sessions (id, start_time, end_time, capacity, cancelled_at)
+values ('TEST-RESTORE-EXPIRED', now() + interval '5 hours', now() + interval '6 hours', 0, now() - interval '8 days');
+do $$ begin
+  begin
+    perform public.admin_restore_session('TEST-RESTORE-EXPIRED', false, 25);
+    raise exception 'Expired restoration succeeded';
+  exception when others then if sqlerrm not like '%within seven days%' then raise; end if; end;
+  if has_function_privilege('anon', 'public.admin_restore_session(text,boolean,integer)', 'execute') then
+    raise exception 'Anonymous restoration access';
   end if;
 end; $$;
 

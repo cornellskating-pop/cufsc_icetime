@@ -110,9 +110,10 @@ Deno.serve(async (req) => {
 
     if (payload.table === "booking_removal_notifications") {
       const { data: notice, error } = await supabase.from("booking_removal_notifications")
-        .select("id, recipient_email, member_name, start_time, end_time, refunded, sent_at, reason")
+        .select("*")
         .eq("id", approvalId).single();
       if (error || !notice) throw new Error("Removal notification not found");
+      if (notice.superseded_at) return new Response("Cancellation was undone; notification skipped", { status: 200 });
       if (notice.sent_at) return new Response("Already sent", { status: 200 });
       const recipients = validUniqueEmails([notice.recipient_email]);
       if (!recipients.length) throw new Error("Removal notification has no valid recipient");

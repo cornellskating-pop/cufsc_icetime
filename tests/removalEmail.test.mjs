@@ -6,10 +6,10 @@ import ts from 'typescript';
 
 const source = fs.readFileSync('supabase/functions/notify-admins/index.ts', 'utf8').replace(/^import .*\n/, '');
 const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
-function harness({ sent = false, emailFails = false, sessionCancelled = false } = {}) {
+function harness({ sent = false, emailFails = false, sessionCancelled = false, superseded = false } = {}) {
   let handler;
   const calls = [];
-  const notice = { reason: sessionCancelled ? 'session_cancelled' : 'booking_removed', id: 'test-notice', recipient_email: 'member@example.test', member_name: 'Test Member', start_time: '2026-10-01T00:00:00Z', end_time: '2026-10-01T01:00:00Z', refunded: true, sent_at: sent ? '2026-09-21T00:00:00Z' : null };
+  const notice = { superseded_at: superseded ? '2026-09-22T00:00:00Z' : null, reason: sessionCancelled ? 'session_cancelled' : 'booking_removed', id: 'test-notice', recipient_email: 'member@example.test', member_name: 'Test Member', start_time: '2026-10-01T00:00:00Z', end_time: '2026-10-01T01:00:00Z', refunded: true, sent_at: sent ? '2026-09-21T00:00:00Z' : null };
   vm.runInNewContext(code, {
     Request, Response, console: { error() {} },
     Deno: { env: { get: key => ({ SUPABASE_SECRET_KEYS: '{"default":"fake-test-key"}', NOTIFY_WEBHOOK_SECRET: 'test-secret', RESEND_API_KEY: 'fake-test-key', SUPABASE_URL: 'https://example.test' })[key] }, serve: fn => { handler = fn; } },
@@ -53,4 +53,10 @@ test('session cancellation email clearly identifies the whole-session cancellati
   const email = JSON.parse(h.calls[0].options.body);
   assert.equal(email.subject, 'Your CUFSC ice session was cancelled');
   assert.match(email.text, /session has been cancelled/);
+});
+
+test('undone cancellations do not send outdated cancellation emails', async () => {
+  const h = harness({ sessionCancelled: true, superseded: true });
+  assert.equal((await h.run()).status, 200);
+  assert.equal(h.calls.length, 0);
 });
