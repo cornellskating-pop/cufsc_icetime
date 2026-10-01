@@ -84,7 +84,7 @@ npm run build
 For countdown and removal-email changes, run the isolated boundary and mocked delivery tests (Node.js 22.18+ supports the TypeScript test directly):
 
 ```bash
-node --test tests/bookingTime.test.ts tests/removalEmail.test.mjs
+node --test tests/bookingTime.test.ts tests/bookingSelection.test.ts tests/removalEmail.test.mjs
 ```
 
 These use synthetic fixtures and do not send real email. Database regression tests also cover contingency balances, admin removal authorization, notification records, and refund idempotency.

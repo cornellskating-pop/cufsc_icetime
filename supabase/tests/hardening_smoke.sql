@@ -33,11 +33,11 @@ select set_config(
 do $$
 begin
   begin
-    perform public.book_sessions(array['TEST-NORMAL', 'TEST-GRACE', 'TEST-LOCKED']);
-    raise exception 'Expected the two-session server limit to reject three sessions';
+    perform public.book_sessions(array['TEST-NORMAL', 'TEST-NORMAL']);
+    raise exception 'Expected duplicate session IDs to be rejected';
   exception
     when others then
-      if sqlerrm not like '%at most two%' then
+      if sqlerrm not like '%Duplicate session IDs%' then
         raise;
       end if;
   end;
@@ -487,4 +487,32 @@ do $$ begin
   end if;
 end; $$;
 
+-- Larger batches remain bounded by the locked credit balance.
+insert into public.sessions (id, start_time, end_time, capacity)
+select 'TEST-BATCH-' || i, now() + interval '4 hours', now() + interval '5 hours', 10
+from generate_series(1,4) i;
+update public.users set credits_balance = 3, tier = 'basic' where id = '00000000-0000-0000-0000-000000000002';
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
+set local role authenticated;
+select public.set_booking_view('list');
+do $$ begin
+  begin
+    perform public.set_booking_view('attendees');
+    raise exception 'Attendees persisted as preference';
+  exception when others then if sqlerrm not like '%Invalid booking view%' then raise; end if; end;
+end; $$;
+select public.book_sessions(array['TEST-BATCH-1','TEST-BATCH-2','TEST-BATCH-3','TEST-BATCH-4']);
+reset role;
+do $$ begin
+  if (select count(*) from public.bookings where session_id like 'TEST-BATCH-%' and status = 'active') <> 3 then
+    raise exception 'Three credits must permit exactly three charged bookings';
+  end if;
+  if (select credits_balance from public.users where id = '00000000-0000-0000-0000-000000000002') <> 0 then
+    raise exception 'Batch credits incorrect';
+  end if;
+  if (select booking_view from public.users where id = '00000000-0000-0000-0000-000000000002') <> 'list'
+     or (select booking_view from public.users where id = '00000000-0000-0000-0000-000000000001') <> 'calendar' then
+    raise exception 'View preference must be valid and private to account';
+  end if;
+end; $$;
 rollback;

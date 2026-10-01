@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
+import { canSelectSession, selectionCost } from "../../lib/bookingSelection";
 import { formatCountdownAmount, freeBookingIndicator } from "../../lib/bookingTime";
 import { SessionAttendees } from "../../lib/sessionAttendees";
 import { Loading, LogoMark, Msg, SpotBar } from "../../lib/ui";
@@ -32,6 +33,7 @@ type Profile = {
   tier: string | null;
   credits_balance: number;
   is_admin: boolean;
+  booking_view: "calendar" | "list";
 };
 
 type BookingResult = {
@@ -392,6 +394,7 @@ function CalendarView({
   bookedSessionIds,
   nowMs,
   onMonthChange,
+  canSelect,
   onToggle,
 }: {
   sessions: Session[];
@@ -400,6 +403,7 @@ function CalendarView({
   bookedSessionIds: ReadonlySet<string>;
   nowMs: number;
   onMonthChange: (offset: number) => void;
+  canSelect: (id: string) => boolean;
   onToggle: (id: string) => void;
 }) {
   const sessionsByDay = useMemo(() => {
@@ -489,7 +493,7 @@ function CalendarView({
                     const locked = status === "soon";
                     const unavailable =
                       status === "ended" || status === "full" || status === "closed";
-                    const selectionBlocked = !checked && selected.length >= 2;
+                    const selectionBlocked = !checked && !canSelect(session.id);
                     const disabled = booked || locked || unavailable || selectionBlocked;
                     const countdown = formatAvailabilityCountdown(session.release_at, nowMs);
                     const availabilityText = countdown
@@ -560,19 +564,24 @@ export default function Dashboard() {
   const [msg, setMsg] = useState("");
   const [msgType, setMsgType] = useState<"success" | "error" | "info">("info");
   const [viewMode, setViewMode] = useState<"calendar" | "list" | "attendees">("calendar");
+  const preferenceQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const [preferenceError, setPreferenceError] = useState("");
   const [calendarMonth, setCalendarMonth] = useState<CalendarMonth>(getCurrentETMonth);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
-  const refreshData = async (userId: string) => {
+  const refreshData = async (userId: string, restoreView = false) => {
     const [{ data: sData }, { data: bData }, { data: uData }] = await Promise.all([
       supabase.from("sessions_with_spots").select("*").order("start_time", { ascending: true }),
       supabase.from("my_bookings").select("*").eq("status", "active").gte("start_time", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()).order("start_time", { ascending: false }),
-      supabase.from("users").select("email, name, tier, credits_balance, is_admin").eq("id", userId).maybeSingle(),
+      supabase.from("users").select("email, name, tier, credits_balance, is_admin, booking_view").eq("id", userId).maybeSingle(),
     ]);
 
     setSessions((sData || []) as Session[]);
     setMyBookings((bData || []) as MyBooking[]);
-    if (uData) setProfile(uData as Profile);
+    if (uData) {
+      setProfile(uData as Profile);
+      if (restoreView) setViewMode(uData.booking_view === "list" ? "list" : "calendar");
+    }
   };
 
   useEffect(() => {
@@ -581,7 +590,7 @@ export default function Dashboard() {
         window.location.href = "/login";
         return;
       }
-      refreshData(data.user.id).then(() => setLoading(false));
+      refreshData(data.user.id, true).then(() => setLoading(false));
     });
   }, []);
 
@@ -608,7 +617,19 @@ export default function Dashboard() {
   }, [loading, profile]);
 
   const credits = profile?.credits_balance ?? 0;
-  const maxSelect = Math.min(2, Math.max(0, credits));
+  const approvalOnly = profile?.tier?.toLowerCase() === "temp" && credits <= 0;
+  const selectedCost = selectionCost(sessions, selected, nowMs, approvalOnly);
+  const canSelect = (id: string) => canSelectSession(sessions, selected, id, credits, nowMs, approvalOnly);
+  const chooseView = (view: "calendar" | "list") => {
+    setViewMode(view);
+    setPreferenceError("");
+    // Serialize writes so a slower earlier request cannot overwrite the latest choice.
+    preferenceQueue.current = preferenceQueue.current.catch(() => {}).then(async () => {
+      const { error } = await supabase.rpc("set_booking_view", { p_view: view });
+      if (error) setPreferenceError("Your view could not be saved. Select Calendar or List again to retry.");
+      else setPreferenceError("");
+    }).catch(() => setPreferenceError("Your view could not be saved. Select Calendar or List again to retry."));
+  };
 
   const visibleSessions = useMemo(() => {
     const now = new Date(nowMs);
@@ -630,12 +651,7 @@ export default function Dashboard() {
     setMsg("");
     setSelected((prev) => {
       if (prev.includes(id)) return prev.filter((x) => x !== id);
-      if (prev.length >= 2) {
-        setMsg("You can select at most 2 sessions.");
-        setMsgType("error");
-        return prev;
-      }
-      if (prev.length >= maxSelect && credits > 0) {
+      if (!canSelectSession(sessions, prev, id, credits, nowMs, approvalOnly)) {
         setMsg(`You only have ${credits} credit${credits !== 1 ? "s" : ""}.`);
         setMsgType("error");
         return prev;
@@ -815,7 +831,7 @@ export default function Dashboard() {
           <h2 id="booking-rules-heading">Read before booking</h2>
           <ul className="booking-rules">
             <li>One session per credit.</li>
-            <li>You can select and book up to two sessions at a time.</li>
+            <li>Select as many credit-using sessions as your available credits cover. No-credit bookings do not count toward this limit.</li>
             <li>Charged credits are refunded when cancelled at least 30 minutes before start.</li>
             <li>
               During the final 60 minutes before start, a released session with space can be booked
@@ -847,13 +863,13 @@ export default function Dashboard() {
                 {viewMode === "calendar" ? "Monthly Calendar" : viewMode === "list" ? "Session List" : "Session Attendees"}
               </span>
               <div className="session-view-actions">
-                {viewMode !== "attendees" && <span className="session-select-hint" style={{ fontSize: 12, color: MUTED }}>Select up to 2</span>}
+                {viewMode !== "attendees" && <span className="session-select-hint" style={{ fontSize: 12, color: MUTED }}>{approvalOnly ? "Select sessions to request" : `${selectedCost} / ${credits} credits selected`}</span>}
                 <div className="session-view-toggle" aria-label="Session view">
                   <button
                     type="button"
                     className={viewMode === "calendar" ? "active" : ""}
                     aria-pressed={viewMode === "calendar"}
-                    onClick={() => setViewMode("calendar")}
+                    onClick={() => chooseView("calendar")}
                   >
                     Calendar
                   </button>
@@ -861,7 +877,7 @@ export default function Dashboard() {
                     type="button"
                     className={viewMode === "list" ? "active" : ""}
                     aria-pressed={viewMode === "list"}
-                    onClick={() => setViewMode("list")}
+                    onClick={() => chooseView("list")}
                   >
                     List
                   </button>
@@ -870,6 +886,7 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {preferenceError && <Msg text={preferenceError} type="error" />}
             {viewMode === "attendees" ? (
               <SessionAttendees nowMs={nowMs} bookings={myBookings} />
             ) : viewMode === "calendar" ? (
@@ -881,6 +898,7 @@ export default function Dashboard() {
                 nowMs={nowMs}
                 onMonthChange={(offset) => setCalendarMonth((current) => shiftCalendarMonth(current, offset))}
                 onToggle={toggle}
+                canSelect={canSelect}
               />
             ) : (
               <>
@@ -894,7 +912,7 @@ export default function Dashboard() {
                     s={s}
                     checked={selected.includes(s.id)}
                     booked={bookedSessionIds.has(s.id)}
-                    disabled={!selected.includes(s.id) && selected.length >= 2}
+                    disabled={!canSelect(s.id)}
                     onToggle={() => toggle(s.id)}
                     nowMs={nowMs}
                   />
@@ -934,10 +952,10 @@ export default function Dashboard() {
                   justifyContent: "center",
                   gap: 8,
                 }}
-                disabled={selected.length === 0 || booking}
+                disabled={selected.length === 0 || booking || selectedCost > credits}
                 onClick={book}
               >
-                {booking ? "Booking…" : `Book Selected (${selected.length}/2)`}
+                {booking ? "Booking…" : `Book Selected (${selected.length})`}
               </button>
             </div>}
           </div>
