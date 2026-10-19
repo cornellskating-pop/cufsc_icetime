@@ -13,6 +13,8 @@ Booking and administration system for Cornell University Figure Skating Club ice
 
 Project guides:
 
+- [Practice management guide](docs/PRACTICE_MANAGEMENT_GUIDE.md) — spreadsheet imports, session edits, styling, and templates
+
 - [DESIGN.md](./DESIGN.md) — architecture, data model, authorization, and notification behavior
 - [HANDOFF.md](./HANDOFF.md) — production operations, deployment, and recovery
 - [CONTRIBUTING.md](./CONTRIBUTING.md) — complete workflow for human and AI-assisted changes

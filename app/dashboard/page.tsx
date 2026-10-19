@@ -831,6 +831,7 @@ export default function Dashboard() {
           <h2 id="booking-rules-heading">Read before booking</h2>
           <ul className="booking-rules">
             <li>One session per credit.</li>
+            <li>Purchased credits on temporary member accounts carry over from week to week. Basic members and all admins reset to 2 credits each week.</li>
             <li>Select as many credit-using sessions as your available credits cover. No-credit bookings do not count toward this limit.</li>
             <li>Charged credits are refunded when cancelled at least 30 minutes before start.</li>
             <li>
@@ -1040,6 +1041,11 @@ export default function Dashboard() {
               <span>Credits remaining</span>
               <strong style={{ color: INK }}>{credits}</strong>
             </div>
+            {profile?.tier?.toLowerCase() === "temp" && !profile?.is_admin && (
+              <p style={{ fontSize: 12, color: MUTED, lineHeight: 1.5, margin: "0 0 10px" }}>
+                Your purchased credits carry over from week to week. Weekly resets do not remove your unused credits.
+              </p>
+            )}
               <div style={{ height: 6, background: BORDER, borderRadius: 100, overflow: "hidden" }}>
                 <div
                   style={{

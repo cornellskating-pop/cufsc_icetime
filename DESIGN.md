@@ -74,7 +74,7 @@ through the checked user-management RPC.
 
 ### `tiers`
 
-Stores tier names and legacy `weekly_credits` metadata. The weekly reset no longer reads that allowance: it sets users with case-insensitive `basic` tier or `is_admin = true` to exactly 2. All other balances are untouched, so non-admin temporary members can keep purchased credits across weeks. Admin authority takes precedence even for an admin with the `temp` tier. Both scheduled and manual resets share `private.weekly_reset_credits()`; browser roles cannot execute that helper directly.
+Stores tier names and legacy `weekly_credits` metadata. The weekly reset no longer reads that allowance: it sets users with case-insensitive `basic` tier or `is_admin = true` to exactly 2. All other balances are untouched, so non-admin temporary members can keep purchased credits across weeks. Admin authority takes precedence even for an admin with the `temp` tier. The dashboard booking rules explain weekly carryover, and non-admin temporary members also see a reminder next to their credit balance. Both scheduled and manual resets share `private.weekly_reset_credits()`; browser roles cannot execute that helper directly.
 
 ### `sessions`
 

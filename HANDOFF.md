@@ -17,6 +17,8 @@ Supabase project reference: `dtdyvpjmavurynbccjei`
 
 ## Routine admin work
 
+For seasonal schedule uploads and later edits, use the [practice management guide](docs/PRACTICE_MANAGEMENT_GUIDE.md) and its Excel/CSV templates.
+
 - Add or edit a member: `/admin/users`
 - Add, edit, or remove a session: `/admin/sessions`
 - Review attendance: `/admin/bookings`
