@@ -362,9 +362,9 @@ $$;
 select public.admin_weekly_reset_credits();
 do $$
 begin
-  if exists (select 1 from public.users u join public.tiers t on lower(t.name) = lower(u.tier)
-    where u.credits_balance <> t.weekly_credits) then
-    raise exception 'Normal tier resets must resume after contingency';
+  if exists (select 1 from public.users u
+    where (lower(u.tier) = 'basic' or u.is_admin) and u.credits_balance <> 2) then
+    raise exception 'Basic/admin weekly resets must resume after contingency';
   end if;
 end;
 $$;
@@ -513,6 +513,43 @@ do $$ begin
   if (select booking_view from public.users where id = '00000000-0000-0000-0000-000000000002') <> 'list'
      or (select booking_view from public.users where id = '00000000-0000-0000-0000-000000000001') <> 'calendar' then
     raise exception 'View preference must be valid and private to account';
+  end if;
+end; $$;
+-- Weekly resets preserve purchased temp credits and use admin authority across tiers.
+update public.users set tier = 'temp', credits_balance = 7 where id = '00000000-0000-0000-0000-000000000001';
+update public.users set credits_balance = 5 where id = '00000000-0000-0000-0000-000000000003';
+update public.tiers set weekly_credits = 9 where lower(name) = 'basic';
+set local role authenticated;
+do $$ begin
+  begin
+    perform public.admin_weekly_reset_credits();
+    raise exception 'Non-admin weekly reset succeeded';
+  exception when others then if sqlerrm not like '%Not authorized%' then raise; end if; end;
+end; $$;
+reset role;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+set local role authenticated;
+select public.admin_weekly_reset_credits();
+reset role;
+do $$ begin
+  if exists (select 1 from public.users where id in ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002') and credits_balance <> 2) then
+    raise exception 'Basic and admin balances must reset to exactly 2';
+  end if;
+end; $$;
+update public.users set credits_balance = 8 where id = '00000000-0000-0000-0000-000000000002';
+-- The cron worker calls this same helper after its unchanged time gate.
+select private.weekly_reset_credits();
+select private.weekly_reset_credits();
+do $$ begin
+  if (select credits_balance from public.users where id = '00000000-0000-0000-0000-000000000002') <> 2 then
+    raise exception 'Weekly credits must replace, not accumulate';
+  end if;
+  if not exists (select 1 from public.users where id = '00000000-0000-0000-0000-000000000003' and tier = 'temp' and credits_balance = 5) then
+    raise exception 'Purchased temporary credits must survive repeated resets';
+  end if;
+  if has_function_privilege('authenticated', 'private.weekly_reset_credits()', 'execute')
+     or has_function_privilege('anon', 'public.admin_weekly_reset_credits()', 'execute') then
+    raise exception 'Weekly reset permissions too broad';
   end if;
 end; $$;
 rollback;

@@ -61,7 +61,7 @@ The admin layout verifies the current profile before mounting admin pages. Every
 | `email text` | Normalized lowercase login email |
 | `name text` | Display name |
 | `tier text` | Lowercase tier key |
-| `credits_balance integer` | Spendable weekly credits |
+| `credits_balance integer` | Spendable credits |
 | `is_admin boolean` | Administrative authority |
 | `paid_dues boolean` | Dues status |
 | `created_at timestamptz` | Creation time |
@@ -74,7 +74,7 @@ through the checked user-management RPC.
 
 ### `tiers`
 
-Maps a tier name to `weekly_credits`. Weekly reset matching is case-insensitive for compatibility with historical tier rows.
+Stores tier names and legacy `weekly_credits` metadata. The weekly reset no longer reads that allowance: it sets users with case-insensitive `basic` tier or `is_admin = true` to exactly 2. All other balances are untouched, so non-admin temporary members can keep purchased credits across weeks. Admin authority takes precedence even for an admin with the `temp` tier. Both scheduled and manual resets share `private.weekly_reset_credits()`; browser roles cannot execute that helper directly.
 
 ### `sessions`
 
@@ -235,7 +235,7 @@ Native accordion headers share the admin date/time, notes label, and booking-cou
 
 ## Contingency credits and admin removals
 
-`admin_one_credit_contingency()` requires admin access, locks user rows, immediately replaces non-temporary balances (including admins) with 1 and temporary balances with 0, and writes `CONTINGENCY_RESET` audit entries. Tiers and existing bookings are unchanged. It is a balance reset, not a weekly spending cap: previous spending is not subtracted, repeat runs reset again, and eligible refunds may increase balances. The ordinary scheduled/manual tier reset resumes normal allowances without persistent configuration changes.
+`admin_one_credit_contingency()` requires admin access, locks user rows, immediately replaces non-temporary balances (including admins) with 1 and temporary balances with 0, and writes `CONTINGENCY_RESET` audit entries. Tiers and existing bookings are unchanged. It is a balance reset, not a weekly spending cap: previous spending is not subtracted, repeat runs reset again, and eligible refunds may increase balances. The ordinary scheduled/manual reset sets Basic members and all admins to 2 while preserving other balances. The contingency itself still clears temporary balances.
 
 `admin_remove_booking(uuid)` requires admin access, locks the booking and member rows, and cancels an active booking before the session ends. A charged credit is refunded regardless of the member cancellation cutoff; free bookings never produce credits. Repeated calls do not refund or notify twice. The transaction inserts a durable `booking_removal_notifications` record containing the recipient, session snapshot, refund flag, and acting admin. Browser roles have no access to this RLS-enabled table; the service role can read records and mark delivery.
 
@@ -259,4 +259,4 @@ New cancellations snapshot the original capacity, label, and pending-request not
 
 The dashboard restores the member’s last Calendar or List view from their account before displaying sessions. Attendees does not change the saved preference. Preference writes are serialized and failures show a retry message. The authorized `set_booking_view(text)` RPC updates only the caller’s own preference.
 
-Selection counts credit-using sessions against the current balance, with no fixed two-session cap. The existing no-credit window and temporary-member approval requests remain available. Batch booking locks sessions in a consistent order and enforces spending on the server. Weekly tier allowances are unchanged (normally two credits per week). Deploy `20260930120000_credit_selection_and_view_preference.sql` before the frontend.
+Selection counts credit-using sessions against the current balance, with no fixed two-session cap. The existing no-credit window and temporary-member approval requests remain available. Batch booking locks sessions in a consistent order and enforces spending on the server. Weekly resets set Basic members and all admins to exactly 2 credits; other balances, including non-admin temporary members, carry over unchanged. Deploy `20260930120000_credit_selection_and_view_preference.sql` before the frontend.

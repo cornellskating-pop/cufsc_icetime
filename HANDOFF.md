@@ -224,11 +224,11 @@ Apply `20260921120000_add_member_session_attendees.sql` before deploying the fro
 
 Deploy the backward-compatible `notify-admins` Edge Function first, then apply `20260921130000_add_admin_booking_removal.sql` and `20260921140000_add_one_credit_contingency.sql`, then deploy the frontend. Follow the migration-list/dry-run and authorization requirements above. Neither applying these migrations nor deploying the UI removes bookings, changes balances, or sends member emails by itself.
 
-In Admin Tools, **One-credit contingency** replaces remaining balances immediately (1 for non-temporary accounts including admins, 0 for temporary accounts). The confirmation explains repeat runs, existing bookings, and refunds. The next normal weekly reset restores tier allowances. In Admin Bookings, **Remove** confirms the member and session, cancels the booking, refunds any charged credit, and queues the notification. Ended sessions cannot be changed with this action.
+In Admin Tools, **One-credit contingency** replaces remaining balances immediately (1 for non-temporary accounts including admins, 0 for temporary accounts). The confirmation explains repeat runs, existing bookings, and refunds. The next normal weekly reset sets Basic members and all admins to 2 while preserving other balances. In Admin Bookings, **Remove** confirms the member and session, cancels the booking, refunds any charged credit, and queues the notification. Ended sessions cannot be changed with this action.
 
 Check removal notifications in `booking_removal_notifications` through trusted backend access; `sent_at is null` means delivery has not been confirmed. Investigate pg_net, Edge Function, and Resend failures before replaying the authenticated webhook with the same notification ID. Do not create another notification record to retry. The provider's idempotency protection is time-limited; check delivery history before retrying old uncertain deliveries. Avoid printing recipient data or webhook secrets in logs. No automatic retry schedule is installed.
 
-Verify a non-admin cannot invoke either admin operation, a removed charged booking refunds only once, a free booking never refunds, the member receives the correct session/refund email, and no email goes to the club/admin override address. Verify the contingency keeps tiers/bookings intact and the next regular reset uses tier allowances. Check the rules panel and no-credit labels at narrow and wide widths.
+Verify a non-admin cannot invoke either admin operation, a removed charged booking refunds only once, a free booking never refunds, the member receives the correct session/refund email, and no email goes to the club/admin override address. Verify the contingency keeps tiers/bookings intact and the next regular reset sets Basic members and admins to 2 and preserves other balances. Check the rules panel and no-credit labels at narrow and wide widths.
 
 ## Entire-session cancellation
 
@@ -248,4 +248,10 @@ Deploy the compatible email worker (which accepts records without the new option
 
 The dashboard restores the member’s last Calendar or List view from their account before displaying sessions. Attendees does not change the saved preference. Preference writes are serialized and failures show a retry message. The authorized `set_booking_view(text)` RPC updates only the caller’s own preference.
 
-Selection counts credit-using sessions against the current balance, with no fixed two-session cap. The existing no-credit window and temporary-member approval requests remain available. Batch booking locks sessions in a consistent order and enforces spending on the server. Weekly tier allowances are unchanged (normally two credits per week). Deploy `20260930120000_credit_selection_and_view_preference.sql` before the frontend.
+Selection counts credit-using sessions against the current balance, with no fixed two-session cap. The existing no-credit window and temporary-member approval requests remain available. Batch booking locks sessions in a consistent order and enforces spending on the server. Weekly resets set Basic members and all admins to exactly 2 credits; other balances, including non-admin temporary members, carry over unchanged. Deploy `20260930120000_credit_selection_and_view_preference.sql` before the frontend.
+
+## Weekly credit carryover rollout
+
+Apply `20261019120000_preserve_temporary_weekly_credits.sql` before deploying the updated Admin Tools copy. Applying it does not immediately reset any balance. Both the Sunday 4:30 PM Eastern job and manual weekly reset then set Basic members and all admins to exactly 2, preserving all other balances. Purchased credits on non-admin temporary accounts carry over. The separate contingency and semester account reset still clear temporary balances when explicitly run.
+
+Verify the reset with synthetic accounts locally: Basic balances above/below 2 become 2, an admin on the temp tier becomes 2, and a non-admin temp balance of 5 remains 5 across repeated resets. Do not trigger a production reset merely to test deployment.

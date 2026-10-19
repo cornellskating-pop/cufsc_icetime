@@ -35,7 +35,7 @@ export default function AdminTools() {
     {
       key: "one-credit-contingency",
       title: "One-credit contingency",
-      description: "Immediately sets every non-temporary account (including admins) to 1 remaining credit and temporary accounts to 0. Normal tier balances resume at the next weekly reset.",
+      description: "Immediately sets every non-temporary account (including admins) to 1 remaining credit and temporary accounts to 0. The next weekly reset sets Basic members and admins to 2; other balances stay unchanged.",
       confirmation: "Replace current balances with 1 credit for non-temporary accounts and 0 for temporary accounts? This does not change tiers or existing bookings, and does not subtract credits already used. Running it again replaces balances again. Eligible cancellation refunds can still increase balances.",
       confirmLabel: "Set contingency balances",
       destructive: true,
@@ -44,8 +44,8 @@ export default function AdminTools() {
     {
       key: "reset",
       title: "Weekly Credit Reset",
-      description: "Sets every user's credits_balance to their tier's weekly_credits value. Runs automatically each week — use this to trigger manually if needed.",
-      confirmation: "This immediately resets credit balances using each account's current tier.",
+      description: "Sets Basic members and all admins to 2 credits. Other balances, including temporary members, carry over unchanged. Runs automatically each week — use this to trigger manually if needed.",
+      confirmation: "This immediately sets Basic members and all admins to exactly 2 credits, rather than adding 2. Other balances, including temporary members, stay unchanged.",
       confirmLabel: "Reset credits",
       action: async () => {
         const result = await supabase.rpc("admin_weekly_reset_credits");

@@ -87,7 +87,7 @@ For countdown and removal-email changes, run the isolated boundary and mocked de
 node --test tests/bookingTime.test.ts tests/bookingSelection.test.ts tests/removalEmail.test.mjs
 ```
 
-These use synthetic fixtures and do not send real email. Database regression tests also cover contingency balances, admin removal authorization, notification records, and refund idempotency.
+These use synthetic fixtures and do not send real email. Database regression tests also cover weekly Basic/admin resets, temporary purchased-credit carryover across repeated resets, contingency balances, admin removal authorization, notification records, and refund idempotency.
 
 For database changes, also run the local stack and smoke test:
 

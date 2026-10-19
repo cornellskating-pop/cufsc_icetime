@@ -58,7 +58,7 @@ npx supabase stop
 
 Add `http://localhost:3000/auth/callback` to the Supabase Auth redirect allowlist before testing local Google login.
 
-Admins can remove individual bookings with credit refunds and email notifications. Admin Tools also includes an immediate one-credit contingency reset; temporary accounts receive zero, and the next weekly reset restores normal tier allowances. The dashboard highlights booking rules and shows the countdown to no-credit booking in calendar and list views.
+Admins can remove individual bookings with credit refunds and email notifications. Admin Tools also includes an immediate one-credit contingency reset; temporary accounts receive zero, and the next weekly reset sets Basic members and all admins to 2 while preserving other balances. The dashboard highlights booking rules and shows the countdown to no-credit booking in calendar and list views.
 
 ## Database workflow
 
@@ -86,4 +86,4 @@ New cancellations snapshot the original capacity, label, and pending-request not
 
 The dashboard restores the member’s last Calendar or List view from their account before displaying sessions. Attendees does not change the saved preference. Preference writes are serialized and failures show a retry message. The authorized `set_booking_view(text)` RPC updates only the caller’s own preference.
 
-Selection counts credit-using sessions against the current balance, with no fixed two-session cap. The existing no-credit window and temporary-member approval requests remain available. Batch booking locks sessions in a consistent order and enforces spending on the server. Weekly tier allowances are unchanged (normally two credits per week). Deploy `20260930120000_credit_selection_and_view_preference.sql` before the frontend.
+Selection counts credit-using sessions against the current balance, with no fixed two-session cap. The existing no-credit window and temporary-member approval requests remain available. Batch booking locks sessions in a consistent order and enforces spending on the server. Weekly resets set Basic members and all admins to exactly 2 credits; other balances, including non-admin temporary members, carry over unchanged. Deploy `20260930120000_credit_selection_and_view_preference.sql` before the frontend.
