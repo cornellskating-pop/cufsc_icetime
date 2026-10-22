@@ -89,6 +89,8 @@ node --test tests/bookingTime.test.ts tests/bookingSelection.test.ts tests/remov
 
 These use synthetic fixtures and do not send real email. Database regression tests also cover weekly Basic/admin resets, temporary purchased-credit carryover across repeated resets, contingency balances, admin removal authorization, notification records, and refund idempotency.
 
+For roster changes, check before start, exactly at start, during the session, and exactly at end in both member Attendees and Admin Bookings. The SQL smoke test covers ongoing rosters and the start/end boundaries.
+
 For database changes, also run the local stack and smoke test:
 
 ```bash

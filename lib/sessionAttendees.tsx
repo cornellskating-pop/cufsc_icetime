@@ -61,8 +61,8 @@ export function SessionAttendees({ nowMs, bookings }: { nowMs: number; bookings:
 
   if (error) return <div role="alert" style={{ padding: 20 }}>{error} <button type="button" onClick={() => setAttempt(value => value + 1)}>Retry</button></div>;
   if (!groups) return <div role="status" style={{ padding: 20 }}>Loading attendees…</div>;
-  const upcoming = groups.filter(group => new Date(group.start_time).getTime() >= nowMs);
-  if (!upcoming.length) return <div style={{ padding: 20, color: "var(--muted)" }}>No upcoming sessions.</div>;
+  const upcoming = groups.filter(group => new Date(group.end_time).getTime() > nowMs);
+  if (!upcoming.length) return <div style={{ padding: 20, color: "var(--muted)" }}>No ongoing or upcoming sessions.</div>;
 
   return <div style={{ padding: 12, display: "grid", gap: 12 }}>
     {upcoming.map(group => <details className="card attendance-session" key={group.session_id}>

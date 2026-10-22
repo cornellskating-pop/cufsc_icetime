@@ -67,8 +67,8 @@ export default function AdminBookings() {
 
       const now = new Date();
       const allSessions = (sessionsResult.data || []) as SessionRow[];
-      const upcoming = allSessions.filter(s => new Date(s.start_time) >= now);
-      const past8 = allSessions.filter(s => new Date(s.end_time) < now).slice(-8).reverse();
+      const upcoming = allSessions.filter(s => new Date(s.end_time) > now);
+      const past8 = allSessions.filter(s => new Date(s.end_time) <= now).slice(-8).reverse();
 
       setGroups([...upcoming, ...past8].map(s => ({
         session_id: s.id,
@@ -132,7 +132,7 @@ export default function AdminBookings() {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {groups.map(g => {
-              const isPast = new Date(g.end_time) < now;
+              const isPast = new Date(g.end_time) <= now;
               const isOpen = expanded.has(g.session_id);
               return (
                 <div key={g.session_id} className="card">

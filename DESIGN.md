@@ -165,7 +165,7 @@ confirmation before invoking the checked RPC.
 - `authenticated` receives only required read grants and explicit RPC execution grants.
 - Browser writes occur through RPCs rather than direct table privileges.
 - Users can select only their own profile and bookings.
-- Admin RPCs protect emails, credits, and detailed attendance. Members may read upcoming session attendee names through the restricted RPC below.
+- Admin RPCs protect emails, credits, and detailed attendance. Members may read ongoing and upcoming session attendee names through the restricted RPC below.
 - Default privileges no longer automatically expose new tables or functions.
 
 RLS remains enabled on users, sessions, bookings, approvals, tiers, and the credit audit table.
@@ -229,9 +229,9 @@ Schema inspection dumps, including local `supabase/schema.sql`, are ignored. The
 
 ## Member attendance
 
-The dashboard Attendees tab calls `list_upcoming_session_attendees()`. This fixed-search-path SECURITY DEFINER RPC requires an authenticated profile in `users`; anonymous callers and authenticated non-members cannot use it. It returns upcoming sessions (start time at or after now), including empty and unreleased sessions, sorted by start time and ID. Only active booking names are returned, ordered by signup time with booking ID as a deterministic tie-breaker. No attendee IDs, emails, tiers, or timestamps are exposed, and table RLS is unchanged.
+The dashboard Attendees tab calls `list_upcoming_session_attendees()`. This fixed-search-path SECURITY DEFINER RPC requires an authenticated profile in `users`; anonymous callers and authenticated non-members cannot use it. It returns ongoing and upcoming sessions (end time strictly after now), including empty and unreleased sessions, sorted by start time and ID. Only active booking names are returned, ordered by signup time with booking ID as a deterministic tie-breaker. No attendee IDs, emails, tiers, or timestamps are exposed, and table RLS is unchanged.
 
-Native accordion headers share the admin date/time, notes label, and booking-count/capacity presentation. Names flow across five columns in blocks of at most 25; unused rows are omitted and additional blocks preserve all attendees for larger sessions. Cell measurements choose full name, last-name initial, then initials, recalculating after resizing and font loading. Full names remain accessible via labels and tooltips. Attendees reload on opening the tab and after the member’s booking/cancellation refresh. The existing admin table and permissions are preserved.
+Native accordion headers share the admin date/time, notes label, and booking-count/capacity presentation. Names flow across five columns in blocks of at most 25; unused rows are omitted and additional blocks preserve all attendees for larger sessions. Cell measurements choose full name, last-name initial, then initials, recalculating after resizing and font loading. Full names remain accessible via labels and tooltips. Attendees reload on opening the tab and after the member’s booking/cancellation refresh. Admin Bookings includes ongoing and upcoming sessions plus the eight most recently ended sessions. Sessions ending exactly now count as ended. The existing admin table and permissions are preserved.
 
 ## Contingency credits and admin removals
 

@@ -257,3 +257,7 @@ Selection counts credit-using sessions against the current balance, with no fixe
 Apply `20261019120000_preserve_temporary_weekly_credits.sql` before deploying the updated Admin Tools copy. Applying it does not immediately reset any balance. Both the Sunday 4:30 PM Eastern job and manual weekly reset then set Basic members and all admins to exactly 2, preserving all other balances. Purchased credits on non-admin temporary accounts carry over. The separate contingency and semester account reset still clear temporary balances when explicitly run.
 
 Verify the reset with synthetic accounts locally: Basic balances above/below 2 become 2, an admin on the temp tier becomes 2, and a non-admin temp balance of 5 remains 5 across repeated resets. Do not trigger a production reset merely to test deployment.
+
+## Ongoing roster rollout
+
+Apply `20261022120000_include_ongoing_session_attendees.sql` before deploying the frontend, using the authorized migration-list and dry-run procedure. No Edge Function changes are required. Verify the member Attendees tab and Admin Bookings both retain a roster after its session starts. At the exact end time, members stop seeing it and admins retain it among the eight recent ended sessions. Booking and cancellation permissions are unchanged.

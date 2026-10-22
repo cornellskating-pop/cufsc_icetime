@@ -250,9 +250,13 @@ $$;
 -- Member attendance: names only, active bookings, deterministic signup order.
 insert into public.sessions (id, start_time, end_time, capacity, notes)
 values ('TEST-ATTENDANCE', now() + interval '5 hours', now() + interval '6 hours', 30, 'Attendance'),
-       ('TEST-PAST', now() - interval '2 hours', now() - interval '1 hour', 5, 'Past');
+       ('TEST-PAST', now() - interval '2 hours', now() - interval '1 hour', 5, 'Past'),
+       ('TEST-ONGOING', now() - interval '15 minutes', now() + interval '45 minutes', 5, 'Ongoing'),
+       ('TEST-STARTING', now(), now() + interval '1 hour', 5, 'Starting'),
+       ('TEST-ENDING', now() - interval '1 hour', now(), 5, 'Ending');
 insert into public.bookings (id, session_id, user_id, created_at, status, credit_charged)
 values
+  ('10000000-0000-0000-0000-000000000004', 'TEST-ONGOING', '00000000-0000-0000-0000-000000000002', now() - interval '1 hour', 'active', false),
   ('10000000-0000-0000-0000-000000000002', 'TEST-ATTENDANCE', '00000000-0000-0000-0000-000000000002', now(), 'active', false),
   ('10000000-0000-0000-0000-000000000001', 'TEST-ATTENDANCE', '00000000-0000-0000-0000-000000000001', now(), 'active', false),
   ('10000000-0000-0000-0000-000000000003', 'TEST-ATTENDANCE', '00000000-0000-0000-0000-000000000003', now() - interval '1 hour', 'cancelled', false);
@@ -264,7 +268,15 @@ begin
       is distinct from array['Admin', 'Member']::text[] then
     raise exception 'Attendance must return active names in stable signup order';
   end if;
-  if exists (select 1 from public.list_upcoming_session_attendees() where session_id = 'TEST-PAST') then
+  if (select names from public.list_upcoming_session_attendees() where session_id = 'TEST-ONGOING')
+      is distinct from array['Member']::text[] then
+    raise exception 'Ongoing sessions must retain their roster';
+  end if;
+  if (select names from public.list_upcoming_session_attendees() where session_id = 'TEST-STARTING')
+      is distinct from array[]::text[] then
+    raise exception 'Sessions starting now must remain visible';
+  end if;
+  if exists (select 1 from public.list_upcoming_session_attendees() where session_id in ('TEST-PAST', 'TEST-ENDING')) then
     raise exception 'Past sessions must not be exposed';
   end if;
   if (select names from public.list_upcoming_session_attendees() where session_id = 'TEST-LOCKED')
