@@ -261,3 +261,9 @@ Verify the reset with synthetic accounts locally: Basic balances above/below 2 b
 ## Ongoing roster rollout
 
 Apply `20261022120000_include_ongoing_session_attendees.sql` before deploying the frontend, using the authorized migration-list and dry-run procedure. No Edge Function changes are required. Verify the member Attendees tab and Admin Bookings both retain a roster after its session starts. At the exact end time, members stop seeing it and admins retain it among the eight recent ended sessions. Booking and cancellation permissions are unchanged.
+
+## Walk-on payment popup rollout
+
+Frontend-only; no migration, payment credentials, or Edge Function deployment is needed. With synthetic temp accounts, verify one new approval request prompts $15 and two prompt $30, with CUFSC as recipient and the member name in the note. Mixed batches charge only for newly submitted requests; pending retries, successful bookings, and failures are excluded. Check Close, Escape, keyboard focus, and narrow screens. Opening Venmo does not confirm payment; admins continue verifying payment and approving requests manually. Actual payment completion is not part of automated testing.
+
+Temporary members may select more sessions than their available credits. The existing booking RPC spends credits as it processes the batch and submits approval requests once they run out. The Venmo popup counts only new approval requests: one credit covering one of two paid sessions leaves a $15 payment, not $30. Free bookings and failed or already-pending requests do not add to the payment.

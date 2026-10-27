@@ -15,3 +15,9 @@ test("free bookings and approval requests do not consume selection credits", () 
   assert.equal(canSelectSession(sessions, ["a", "b"], "c", 0, now, true), true);
   assert.equal(canSelectSession(sessions, [], "a", 0, now), false);
 });
+
+test("temporary members can select beyond a positive balance for approval of the remainder", () => {
+  assert.equal(canSelectSession(sessions, ["a"], "b", 1, now, true), true);
+  assert.equal(canSelectSession(sessions, ["a"], "b", 1, now), false);
+  assert.equal(selectionCost(sessions, ["a", "b"], now), 2);
+});

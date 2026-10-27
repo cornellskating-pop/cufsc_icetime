@@ -125,6 +125,10 @@ It:
 
 The former `book_session` function was removed to avoid maintaining a second, divergent ruleset.
 
+## Walk-on payment prompt
+
+After `book_sessions` returns, the dashboard counts distinct successful `Approval request submitted` results and opens a native modal dialog for $15 per new request. Failed requests, confirmed bookings, and already-pending requests are excluded, including in mixed-result batches. The Venmo HTTPS link uses `txn=pay`, `recipients=CUFSC`, a two-decimal total, and a URL-encoded note containing the profile name (email fallback) and session count. The dialog reminds members to include their Cornell email and skip payment if already paid. It supports Close and Escape, native modal focus containment, and focus restoration. There is no payment callback or automatic credit/approval change; the existing RPC remains authoritative.
+
 ## Cancellation transaction
 
 `cancel_booking(uuid)`:
@@ -260,3 +264,5 @@ New cancellations snapshot the original capacity, label, and pending-request not
 The dashboard restores the member’s last Calendar or List view from their account before displaying sessions. Attendees does not change the saved preference. Preference writes are serialized and failures show a retry message. The authorized `set_booking_view(text)` RPC updates only the caller’s own preference.
 
 Selection counts credit-using sessions against the current balance, with no fixed two-session cap. The existing no-credit window and temporary-member approval requests remain available. Batch booking locks sessions in a consistent order and enforces spending on the server. Weekly resets set Basic members and all admins to exactly 2 credits; other balances, including non-admin temporary members, carry over unchanged. Deploy `20260930120000_credit_selection_and_view_preference.sql` before the frontend.
+
+Temporary members may select more sessions than their available credits. The existing booking RPC spends credits as it processes the batch and submits approval requests once they run out. The Venmo popup counts only new approval requests: one credit covering one of two paid sessions leaves a $15 payment, not $30. Free bookings and failed or already-pending requests do not add to the payment.

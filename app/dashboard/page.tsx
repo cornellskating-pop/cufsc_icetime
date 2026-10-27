@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { canSelectSession, selectionCost } from "../../lib/bookingSelection";
 import { formatCountdownAmount, freeBookingIndicator } from "../../lib/bookingTime";
+import { walkOnPayment } from "../../lib/walkOnPayment";
+import { WalkOnPaymentDialog } from "../../lib/walkOnPaymentDialog";
 import { SessionAttendees } from "../../lib/sessionAttendees";
 import { Loading, LogoMark, Msg, SpotBar } from "../../lib/ui";
 
@@ -561,6 +563,7 @@ export default function Dashboard() {
   const [showAll, setShowAll] = useState(false);
   const [loading, setLoading] = useState(true);
   const [booking, setBooking] = useState(false);
+  const [payment, setPayment] = useState<ReturnType<typeof walkOnPayment>>(null);
   const [msg, setMsg] = useState("");
   const [msgType, setMsgType] = useState<"success" | "error" | "info">("info");
   const [viewMode, setViewMode] = useState<"calendar" | "list" | "attendees">("calendar");
@@ -617,9 +620,9 @@ export default function Dashboard() {
   }, [loading, profile]);
 
   const credits = profile?.credits_balance ?? 0;
-  const approvalOnly = profile?.tier?.toLowerCase() === "temp" && credits <= 0;
-  const selectedCost = selectionCost(sessions, selected, nowMs, approvalOnly);
-  const canSelect = (id: string) => canSelectSession(sessions, selected, id, credits, nowMs, approvalOnly);
+  const tempMember = profile?.tier?.toLowerCase() === "temp";
+  const selectedCost = selectionCost(sessions, selected, nowMs);
+  const canSelect = (id: string) => canSelectSession(sessions, selected, id, credits, nowMs, tempMember);
   const chooseView = (view: "calendar" | "list") => {
     setViewMode(view);
     setPreferenceError("");
@@ -651,7 +654,7 @@ export default function Dashboard() {
     setMsg("");
     setSelected((prev) => {
       if (prev.includes(id)) return prev.filter((x) => x !== id);
-      if (!canSelectSession(sessions, prev, id, credits, nowMs, approvalOnly)) {
+      if (!canSelectSession(sessions, prev, id, credits, nowMs, tempMember)) {
         setMsg(`You only have ${credits} credit${credits !== 1 ? "s" : ""}.`);
         setMsgType("error");
         return prev;
@@ -678,6 +681,7 @@ export default function Dashboard() {
 
     const results: BookingResult[] = Array.isArray(data) ? data as BookingResult[] : [];
     const allOk = results.every((r) => r.ok);
+    if (profile) setPayment(walkOnPayment(results, profile.name, profile.email));
 
     setMsg(results.map((r) => `${r.ok ? "✓" : "✗"} ${r.message}`).join("  ·  "));
     setMsgType(allOk ? "success" : "error");
@@ -864,7 +868,7 @@ export default function Dashboard() {
                 {viewMode === "calendar" ? "Monthly Calendar" : viewMode === "list" ? "Session List" : "Session Attendees"}
               </span>
               <div className="session-view-actions">
-                {viewMode !== "attendees" && <span className="session-select-hint" style={{ fontSize: 12, color: MUTED }}>{approvalOnly ? "Select sessions to request" : `${selectedCost} / ${credits} credits selected`}</span>}
+                {viewMode !== "attendees" && <span className="session-select-hint" style={{ fontSize: 12, color: MUTED }}>{tempMember ? `${credits} credit${credits === 1 ? "" : "s"} available · Additional requests: $15/session` : `${selectedCost} / ${credits} credits selected`}</span>}
                 <div className="session-view-toggle" aria-label="Session view">
                   <button
                     type="button"
@@ -953,7 +957,7 @@ export default function Dashboard() {
                   justifyContent: "center",
                   gap: 8,
                 }}
-                disabled={selected.length === 0 || booking || selectedCost > credits}
+                disabled={selected.length === 0 || booking || (!tempMember && selectedCost > credits)}
                 onClick={book}
               >
                 {booking ? "Booking…" : `Book Selected (${selected.length})`}
@@ -1118,6 +1122,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {payment && <WalkOnPaymentDialog payment={payment} onClose={() => setPayment(null)} />}
 
       <style>{`
         .session-view-actions {
