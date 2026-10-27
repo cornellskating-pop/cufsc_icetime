@@ -139,6 +139,10 @@ After `book_sessions` returns, the dashboard counts distinct successful `Approva
 - Refunds only a booking that actually charged a credit and is cancelled at least 30 minutes before start.
 - Writes the refund to `credit_audit`.
 
+## Admin session calendar
+
+Admin Sessions switches between its existing sortable table and a full-width month calendar. Month navigation and Today use Eastern dates; adjacent-month dates remain visible, and narrow screens scroll horizontally. Session cards show time ranges, labels, booking counts, and cancelled/ongoing/ended status, with purple styling for show practice. Clicking a session opens the shared editor in a native modal dialog; + on a date prefills a new session for that date. Cancelled cards open restoration options instead of allowing edits. Saving refreshes both views through `admin_list_sessions`; mutations still use the existing authorized RPCs. The table retains cancellation and deletion actions. Switching views preserves the current editor fields. No database or authorization changes are required.
+
 ## Admin transactions
 
 All admin functions are SECURITY DEFINER, set a fixed search path, and call `is_admin()`:

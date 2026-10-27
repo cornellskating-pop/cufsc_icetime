@@ -91,6 +91,8 @@ These use synthetic fixtures and do not send real email. Database regression tes
 
 For walk-on payment prompt changes, run `node --test tests/walkOnPayment.test.ts`. Use synthetic identities and mixed RPC results; never send a real payment as a test.
 
+For admin calendar changes, run `node --test tests/adminCalendar.test.ts` for Eastern date placement, daylight-saving boundaries, month padding, leap years, and year navigation. Verify editing and saving with synthetic sessions in both views.
+
 For roster changes, check before start, exactly at start, during the session, and exactly at end in both member Attendees and Admin Bookings. The SQL smoke test covers ongoing rosters and the start/end boundaries.
 
 For database changes, also run the local stack and smoke test:

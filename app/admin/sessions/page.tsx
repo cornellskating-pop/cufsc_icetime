@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../../lib/supabaseClient";
+import { AdminSessionCalendar } from "../../../lib/adminSessionCalendar";
+import { AdminSessionEditor } from "../../../lib/adminSessionEditor";
 import { AdminTopBar, Msg } from "../../../lib/ui";
 
 type Row = {
@@ -34,6 +36,8 @@ export default function AdminSessions() {
   const [msgType, setMsgType] = useState<"success"|"error"|"info">("info");
   const [showForm, setShowForm] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
+  const [view, setView] = useState<"table" | "calendar">("table");
+  const closeEditor = () => { setShowForm(false); setEditing(false); setForm(EMPTY_FORM); };
   const [startSort, setStartSort] = useState<"asc" | "desc">("desc");
 
   const load = async () => {
@@ -76,7 +80,7 @@ export default function AdminSessions() {
       capacity: r.capacity,
     });
     setEditing(true); setShowForm(true); setMsg("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (view === "table") window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const fromET = (iso: string) =>
@@ -168,27 +172,35 @@ export default function AdminSessions() {
     <div>
       <AdminTopBar active="sessions" />
 
-      <div style={{ maxWidth: 960, margin: "0 auto", padding: "28px 24px 80px" }}>
+      <div style={{ maxWidth: view === "calendar" ? "none" : 960, margin: "0 auto", padding: "28px 24px 40px" }}>
 
         {/* Header row */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 20 }}>
           <div>
             <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 22, letterSpacing: "-0.02em" }}>Sessions</div>
             <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{rows.length} total</div>
           </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div role="group" aria-label="Session view" style={{ display: "flex", gap: 4 }}>
+              <button type="button" className={view === "table" ? "btn-primary" : "btn-ghost"} aria-pressed={view === "table"} onClick={() => setView("table")}>Table</button>
+              <button type="button" className={view === "calendar" ? "btn-primary" : "btn-ghost"} aria-pressed={view === "calendar"} onClick={() => setView("calendar")}>Calendar</button>
+            </div>
           <button className="btn-primary" onClick={() => { setForm(EMPTY_FORM); setEditing(false); setShowForm(v => !v); }}>
             {showForm && !editing ? "✕ Cancel" : "+ Add Session"}
           </button>
+          </div>
         </div>
 
         {msg && <Msg text={msg} type={msgType} />}
 
         {/* Form */}
         {showForm && (
+          <AdminSessionEditor modal={view === "calendar"} onClose={closeEditor}>
           <div className="card" style={{ padding: 20, marginBottom: 24 }}>
             <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 14, marginBottom: 16 }}>
               {editing ? "Edit Session" : "New Session"}
             </div>
+            {view === "calendar" && msg && <Msg text={msg} type={msgType} />}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               <div style={{ gridColumn: "1/-1" }}>
                 <label style={{ fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 5 }}>Session ID</label>
@@ -216,8 +228,13 @@ export default function AdminSessions() {
               <button className="btn-ghost" onClick={() => { setShowForm(false); setEditing(false); setForm(EMPTY_FORM); }}>Cancel</button>
             </div>
           </div>
+          </AdminSessionEditor>
         )}
 
+        {view === "calendar" ? <AdminSessionCalendar sessions={rows} nowMs={nowMs} onEdit={edit} onRestore={row => void openRestore(row)} onAdd={day => {
+          setForm({ ...EMPTY_FORM, start_time: `${day}T20:00`, end_time: `${day}T21:00` });
+          setEditing(false); setShowForm(true); setMsg("");
+        }} /> : <>
         {/* Table */}
         <div className="card">
           <div style={{ overflowX: "auto" }}>
@@ -287,6 +304,7 @@ export default function AdminSessions() {
             </table>
           </div>
         </div>
+        </>}
       </div>
     </div>
 

@@ -64,6 +64,8 @@ Admins can remove individual bookings with credit refunds and email notification
 
 Temporary members who submit new session approval requests see a dismissible Venmo popup for $15 per newly requested session, with a prefilled payment link to @CUFSC. Payment does not automatically approve a booking.
 
+Admin Sessions includes a Table / Calendar toggle. Calendar fills the available screen width; select a session to edit it or use + on a date to add one. All dates and times are Eastern.
+
 ## Database workflow
 
 The committed files under `supabase/migrations/` are the source of truth. Do not edit production functions or policies directly in the Dashboard. Create and test a migration locally, review `supabase db push --dry-run`, and only then apply it to the linked project.
