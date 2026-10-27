@@ -8,9 +8,9 @@ export type CalendarSession = {
   release_at: string | null; capacity: number; spots_left?: number;
 };
 
-export function AdminSessionCalendar({ sessions, nowMs, onEdit, onAdd, onRestore }: {
+export function AdminSessionCalendar({ sessions, nowMs, onEdit, onAdd, onRestore, onDelete }: {
   sessions: CalendarSession[]; nowMs: number;
-  onEdit: (session: CalendarSession) => void; onAdd: (day: string) => void; onRestore: (session: CalendarSession) => void;
+  onEdit: (session: CalendarSession) => void; onAdd: (day: string) => void; onRestore: (session: CalendarSession) => void; onDelete: (session: CalendarSession) => void;
 }) {
   const [month, setMonth] = useState(() => easternDateKey(new Date(nowMs)).slice(0, 7));
   const days = monthDays(month);
@@ -48,13 +48,15 @@ export function AdminSessionCalendar({ sessions, nowMs, onEdit, onAdd, onRestore
             const practice = session.label?.toLowerCase().startsWith("show practice:");
             const ended = new Date(session.end_time).getTime() <= nowMs;
             const ongoing = !ended && new Date(session.start_time).getTime() <= nowMs;
-            return <button type="button" key={session.id} className={`admin-calendar-session${cancelled ? " cancelled" : practice ? " practice" : ""}`}
+            return <div key={session.id} className="admin-calendar-entry"><button type="button" className={`admin-calendar-session${cancelled ? " cancelled" : practice ? " practice" : ""}`}
               onClick={() => cancelled ? onRestore(session) : onEdit(session)} title={`${session.id} · ${cancelled ? "View restoration options" : "Edit session"}`}>
               <strong>{time(session.start_time)} – {time(session.end_time)}</strong>
               {easternDateKey(session.end_time) !== day.key && <span>Ends {easternDateKey(session.end_time)}</span>}
               <span className="admin-calendar-label">{session.label || "Ice session"}</span>
               <span>{cancelled ? "Cancelled · Restore options" : `${session.capacity - (session.spots_left ?? session.capacity)} / ${session.capacity} booked${ongoing ? " · In progress" : ended ? " · Ended" : ""}`}</span>
-            </button>;
+            </button>
+              <button type="button" className="btn-danger" aria-label={`Delete session ${session.label || session.id} (${session.id})`} onClick={() => onDelete(session)}>Delete session</button>
+            </div>;
           })}
         </div>)}
       </div>
@@ -74,6 +76,7 @@ export function AdminSessionCalendar({ sessions, nowMs, onEdit, onAdd, onRestore
       .admin-calendar-day.today { background:var(--red-light); box-shadow:inset 0 0 0 2px var(--red); }
       .admin-calendar-date { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-size:12px; font-weight:700; }
       .admin-calendar-date button { padding:4px 8px; font-size:20px; }
+      .admin-calendar-entry { margin-bottom:12px; }
       .admin-calendar-session { display:flex; flex-direction:column; gap:5px; width:100%; text-align:left; margin-bottom:7px; padding:10px; background:#fff7f7; border:1px solid #e9c8c8; border-left:3px solid var(--red); border-radius:8px; color:var(--ink); cursor:pointer; font:inherit; overflow-wrap:anywhere; }
       .admin-calendar-session strong { font-size:11px; }
       .admin-calendar-session span { font-size:10px; }

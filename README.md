@@ -64,7 +64,7 @@ Admins can remove individual bookings with credit refunds and email notification
 
 Temporary members who submit new session approval requests see a dismissible Venmo popup for $15 per newly requested session, with a prefilled payment link to @CUFSC. Payment does not automatically approve a booking.
 
-Admin Sessions includes a Table / Calendar toggle. Calendar fills the available screen width; select a session to edit it or use + on a date to add one. All dates and times are Eastern.
+Admin Sessions includes a Table / Calendar toggle. Calendar fills the available screen width; select a session to edit it, use + on a date to add one, or choose Delete session beneath a calendar card to open the deletion confirmation. All dates and times are Eastern.
 
 ## Database workflow
 

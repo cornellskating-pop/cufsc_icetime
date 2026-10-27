@@ -231,7 +231,7 @@ export default function AdminSessions() {
           </AdminSessionEditor>
         )}
 
-        {view === "calendar" ? <AdminSessionCalendar sessions={rows} nowMs={nowMs} onEdit={edit} onRestore={row => void openRestore(row)} onAdd={day => {
+        {view === "calendar" ? <AdminSessionCalendar sessions={rows} nowMs={nowMs} onDelete={setDeleteTarget} onEdit={edit} onRestore={row => void openRestore(row)} onAdd={day => {
           setForm({ ...EMPTY_FORM, start_time: `${day}T20:00`, end_time: `${day}T21:00` });
           setEditing(false); setShowForm(true); setMsg("");
         }} /> : <>
