@@ -55,7 +55,7 @@ export function AdminSessionCalendar({ sessions, nowMs, onEdit, onAdd, onRestore
               <span className="admin-calendar-label">{session.label || "Ice session"}</span>
               <span>{cancelled ? "Cancelled · Restore options" : `${session.capacity - (session.spots_left ?? session.capacity)} / ${session.capacity} booked${ongoing ? " · In progress" : ended ? " · Ended" : ""}`}</span>
             </button>
-              <button type="button" className="btn-danger" aria-label={`Delete session ${session.label || session.id} (${session.id})`} onClick={() => onDelete(session)}>Delete session</button>
+              <button type="button" className="admin-calendar-delete" title="Delete session" aria-label={`Delete session ${session.label || session.id} (${session.id})`} onClick={() => onDelete(session)}><span aria-hidden="true">×</span></button>
             </div>;
           })}
         </div>)}
@@ -76,8 +76,11 @@ export function AdminSessionCalendar({ sessions, nowMs, onEdit, onAdd, onRestore
       .admin-calendar-day.today { background:var(--red-light); box-shadow:inset 0 0 0 2px var(--red); }
       .admin-calendar-date { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-size:12px; font-weight:700; }
       .admin-calendar-date button { padding:4px 8px; font-size:20px; }
-      .admin-calendar-entry { margin-bottom:12px; }
-      .admin-calendar-session { display:flex; flex-direction:column; gap:5px; width:100%; text-align:left; margin-bottom:7px; padding:10px; background:#fff7f7; border:1px solid #e9c8c8; border-left:3px solid var(--red); border-radius:8px; color:var(--ink); cursor:pointer; font:inherit; overflow-wrap:anywhere; }
+      .admin-calendar-entry { position:relative; margin-bottom:12px; }
+      .admin-calendar-delete { position:absolute; top:6px; right:6px; width:32px; height:32px; display:flex; align-items:center; justify-content:center; padding:0; border:1px solid #e9c8c8; border-radius:7px; background:white; color:var(--red); font-size:24px; line-height:1; cursor:pointer; }
+      .admin-calendar-delete:hover { background:var(--red-light); }
+      .admin-calendar-delete:focus-visible { outline:2px solid var(--red); outline-offset:2px; }
+      .admin-calendar-session { display:flex; flex-direction:column; gap:5px; width:100%; text-align:left; margin-bottom:0; padding:10px 44px 10px 10px; min-height:46px; background:#fff7f7; border:1px solid #e9c8c8; border-left:3px solid var(--red); border-radius:8px; color:var(--ink); cursor:pointer; font:inherit; overflow-wrap:anywhere; }
       .admin-calendar-session strong { font-size:11px; }
       .admin-calendar-session span { font-size:10px; }
       .admin-calendar-session .admin-calendar-label { font-size:12px; font-weight:600; }

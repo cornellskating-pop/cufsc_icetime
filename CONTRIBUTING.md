@@ -146,3 +146,5 @@ Keep commits focused and use an imperative summary such as `Notify users when ac
 ## Known local migration replay prerequisite
 
 A clean reset currently stops at `20260904120000_move_fall_session_releases_to_sunday_evening.sql`: its historical assertion expects 46 rows while replay creates 48. The subsequent account conversion also requires the zero-credit `temp` tier before seed execution. Do not edit applied migrations to work around these issues. Restoration regression checks were run on an isolated local database with a temporary copy accepting 48 rows and synthetic `temp`/`basic` tier prerequisites, followed by the remaining unchanged migrations and `hardening_smoke.sql`. This is not a production migration procedure; a standard reset remains blocked until a separate replay fix is made.
+
+Admin-tier changes must preserve the database invariant that Admin implies `is_admin = true`; do not implement this only in the browser. The smoke test covers tier-based promotion, member write denial, self-demotion protection, explicit revocation, and weekly credit eligibility.

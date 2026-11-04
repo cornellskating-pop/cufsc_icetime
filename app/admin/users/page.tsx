@@ -47,7 +47,7 @@ export default function AdminUsers() {
     setMsg("");
     const { data, error } = await supabase.rpc("admin_upsert_user", {
       p_id: form.id || null, p_email: form.email, p_name: form.name,
-      p_tier: form.tier, p_credits_balance: form.credits_balance, p_is_admin: form.is_admin,
+      p_tier: form.tier, p_credits_balance: form.credits_balance, p_is_admin: form.tier === "admin" || form.is_admin,
     });
     if (error) { setMsg(error.message); setMsgType("error"); return; }
     setMsg(`User saved: ${data}`); setMsgType("success");
@@ -121,9 +121,9 @@ export default function AdminUsers() {
                 <input className="input" type="number" min={0} value={form.credits_balance} onChange={sf("credits_balance")} />
               </div>
               <div style={{ gridColumn: "1/-1", display: "flex", alignItems: "center", gap: 10 }}>
-                <input type="checkbox" id="is_admin" checked={form.is_admin}
+                <input type="checkbox" id="is_admin" checked={form.tier === "admin" || form.is_admin} disabled={form.tier === "admin"}
                   onChange={e => setForm(p => ({ ...p, is_admin: e.target.checked }))} />
-                <label htmlFor="is_admin" style={{ fontSize: 13 }}>Grant admin access</label>
+                <label htmlFor="is_admin" style={{ fontSize: 13 }}>{form.tier === "admin" ? "Admin tier automatically grants admin access" : "Grant admin access"}</label>
               </div>
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 16 }}>

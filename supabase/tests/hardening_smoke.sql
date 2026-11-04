@@ -564,4 +564,69 @@ do $$ begin
     raise exception 'Weekly reset permissions too broad';
   end if;
 end; $$;
+-- Admin tier implies access through both trusted writes and the admin RPC.
+insert into public.tiers (name, weekly_credits) values ('admin', 2)
+on conflict (name) do nothing;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
+set local role authenticated;
+do $$ begin
+  begin
+    perform public.admin_upsert_user('00000000-0000-0000-0000-000000000002', 'member@example.test', 'Member', 'admin', 0, false);
+    raise exception 'Non-admin promoted themselves';
+  exception when others then if sqlerrm not like '%Not authorized%' then raise; end if; end;
+  begin
+    update public.users set tier = 'admin' where id = auth.uid();
+    raise exception 'Member directly changed their tier';
+  exception when insufficient_privilege then null; end;
+end; $$;
+reset role;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+set local role authenticated;
+select public.admin_upsert_user('00000000-0000-0000-0000-000000000002', 'member@example.test', 'Member', ' ADMIN ', 0, false);
+-- The self-demotion guard must use effective admin access, not just the flag.
+select public.admin_upsert_user('00000000-0000-0000-0000-000000000001', 'admin@example.test', 'Admin', 'admin', 2, false);
+do $$ begin
+  begin
+    perform public.admin_upsert_user('00000000-0000-0000-0000-000000000001', 'admin@example.test', 'Admin', 'basic', 2, false);
+    raise exception 'Admin removed their own access';
+  exception when others then if sqlerrm not like '%cannot remove your own admin access%' then raise; end if; end;
+end; $$;
+reset role;
+update public.users set is_admin = false where id = '00000000-0000-0000-0000-000000000002';
+do $$ begin
+  if not exists (select 1 from public.users where id = '00000000-0000-0000-0000-000000000002' and tier = 'admin' and is_admin) then
+    raise exception 'Admin tier must always imply admin access';
+  end if;
+end; $$;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
+set local role authenticated;
+do $$ begin
+  if not public.is_admin() then raise exception 'Admin tier lacks RPC authorization'; end if;
+  perform public.admin_list_users();
+  perform public.admin_weekly_reset_credits();
+end; $$;
+reset role;
+do $$ begin
+  if (select credits_balance from public.users where id = '00000000-0000-0000-0000-000000000002') <> 2 then
+    raise exception 'Admin tier must receive two weekly credits';
+  end if;
+end; $$;
+-- Trusted inserts also normalize a false access flag without changing credits.
+insert into public.users (id, email, name, tier, credits_balance, is_admin)
+values ('00000000-0000-0000-0000-000000000004', 'tier-admin@example.test', 'Tier Admin', 'admin', 7, false);
+do $$ begin
+  if not exists (select 1 from public.users where id = '00000000-0000-0000-0000-000000000004' and is_admin and credits_balance = 7) then
+    raise exception 'Admin-tier insert must grant access without resetting credits';
+  end if;
+end; $$;
+-- Explicitly changing both tier and flag still revokes another account's access.
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+set local role authenticated;
+select public.admin_upsert_user('00000000-0000-0000-0000-000000000002', 'member@example.test', 'Member', 'basic', 2, false);
+reset role;
+do $$ begin
+  if (select is_admin from public.users where id = '00000000-0000-0000-0000-000000000002') then
+    raise exception 'Explicit demotion failed';
+  end if;
+end; $$;
 rollback;

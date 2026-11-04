@@ -41,3 +41,5 @@ Do not rewrite historical migrations. Do not update or commit `supabase/schema.s
 ## Completion
 
 Review the diff, confirm no secret or unrelated file is included, summarize behavior and verification, identify any required deployment, and commit or push only when the user explicitly asks.
+
+Admin-tier accounts must always have administrator access (`is_admin = true`), enforced in PostgreSQL. Preserve explicit admin access on other tiers and the self-demotion guard. Treat assigning the Admin tier as granting full administrator permissions.

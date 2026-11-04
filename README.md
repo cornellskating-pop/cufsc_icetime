@@ -64,7 +64,7 @@ Admins can remove individual bookings with credit refunds and email notification
 
 Temporary members who submit new session approval requests see a dismissible Venmo popup for $15 per newly requested session, with a prefilled payment link to @CUFSC. Payment does not automatically approve a booking.
 
-Admin Sessions includes a Table / Calendar toggle. Calendar fills the available screen width; select a session to edit it, use + on a date to add one, or choose Delete session beneath a calendar card to open the deletion confirmation. All dates and times are Eastern.
+Admin Sessions includes a Table / Calendar toggle. Calendar fills the available screen width; select a session to edit it, use + on a date to add one, or choose the X on the right of a calendar card to open the deletion confirmation. All dates and times are Eastern.
 
 ## Database workflow
 
@@ -95,3 +95,5 @@ The dashboard restores the member’s last Calendar or List view from their acco
 Selection counts credit-using sessions against the current balance, with no fixed two-session cap. The existing no-credit window and temporary-member approval requests remain available. Batch booking locks sessions in a consistent order and enforces spending on the server. Weekly resets set Basic members and all admins to exactly 2 credits; other balances, including non-admin temporary members, carry over unchanged. Deploy `20260930120000_credit_selection_and_view_preference.sql` before the frontend.
 
 Temporary members may select more sessions than their available credits. The existing booking RPC spends credits as it processes the batch and submits approval requests once they run out. The Venmo popup counts only new approval requests: one credit covering one of two paid sessions leaves a $15 payment, not $30. Free bookings and failed or already-pending requests do not add to the payment.
+
+Selecting the Admin tier automatically grants administrator access and eligibility for the two-credit weekly reset. Existing admin access on other tiers remains supported.
