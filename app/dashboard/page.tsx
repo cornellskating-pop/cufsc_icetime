@@ -145,7 +145,7 @@ function getSessionTimeline(
     };
   }
 
-  if (nowMs <= endMs) {
+  if (nowMs < endMs) {
     const elapsed = formatElapsedAmount(nowMs - startMs);
     return {
       phase: "in-progress",
@@ -199,7 +199,7 @@ function getSessionStatus(
   const end = new Date(s.end_time);
   const release = s.release_at ? new Date(s.release_at) : null;
 
-  if (now > end) return { status: "ended", badgeLabel: "Ended" };
+  if (now >= end) return { status: "ended", badgeLabel: "Ended" };
 
   if (release && now < release) {
     return {
@@ -210,14 +210,9 @@ function getSessionStatus(
 
   if (s.spots_left <= 0) return { status: "full", badgeLabel: "Full" };
 
-  const minsLeft = (end.getTime() - now.getTime()) / 60000;
   const minsToStart = (start.getTime() - now.getTime()) / 60000;
-  const inProgress = now >= start && now <= end;
-
-  if (inProgress && minsLeft < 30) return { status: "closed", badgeLabel: "Closed" };
-
-  if (minsToStart >= 0 && minsToStart <= 60) {
-    return { status: "grace", badgeLabel: "Grace", subtext: "Last-hour: no credit deducted" };
+  if (minsToStart <= 60) {
+    return { status: "grace", badgeLabel: "Grace", subtext: "No credit deducted" };
   }
 
   return { status: "open", badgeLabel: "Open" };
@@ -568,17 +563,20 @@ export default function Dashboard() {
   const [msgType, setMsgType] = useState<"success" | "error" | "info">("info");
   const [viewMode, setViewMode] = useState<"calendar" | "list" | "attendees">("calendar");
   const preferenceQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const [restriction, setRestriction] = useState<{ blocked: boolean; marks: number; ends_at: string | null; remaining_days: number } | null>(null);
   const [preferenceError, setPreferenceError] = useState("");
   const [calendarMonth, setCalendarMonth] = useState<CalendarMonth>(getCurrentETMonth);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   const refreshData = async (userId: string, restoreView = false) => {
-    const [{ data: sData }, { data: bData }, { data: uData }] = await Promise.all([
+    const [{ data: sData }, { data: bData }, { data: uData }, restrictionResult] = await Promise.all([
       supabase.from("sessions_with_spots").select("*").order("start_time", { ascending: true }),
       supabase.from("my_bookings").select("*").eq("status", "active").gte("start_time", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()).order("start_time", { ascending: false }),
       supabase.from("users").select("email, name, tier, credits_balance, is_admin, booking_view").eq("id", userId).maybeSingle(),
+      supabase.rpc("my_booking_restriction"),
     ]);
 
+    if (!restrictionResult.error) setRestriction(restrictionResult.data);
     setSessions((sData || []) as Session[]);
     setMyBookings((bData || []) as MyBooking[]);
     if (uData) {
@@ -602,6 +600,15 @@ export default function Dashboard() {
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    if (!restriction?.blocked) return;
+    let active = true;
+    void supabase.rpc("my_booking_restriction").then(({ data, error }) => {
+      if (active && !error) setRestriction(data);
+    });
+    return () => { active = false; };
+  }, [nowMs, restriction?.blocked]);
+
   const [accessStatus, setAccessStatus] = useState<"idle"|"pending"|"requested"|"error">("idle");
   const [accessError, setAccessError] = useState("");
 
@@ -622,7 +629,7 @@ export default function Dashboard() {
   const credits = profile?.credits_balance ?? 0;
   const tempMember = profile?.tier?.toLowerCase() === "temp";
   const selectedCost = selectionCost(sessions, selected, nowMs);
-  const canSelect = (id: string) => canSelectSession(sessions, selected, id, credits, nowMs, tempMember);
+  const canSelect = (id: string) => !restriction?.blocked && canSelectSession(sessions, selected, id, credits, nowMs, tempMember);
   const chooseView = (view: "calendar" | "list") => {
     setViewMode(view);
     setPreferenceError("");
@@ -652,6 +659,7 @@ export default function Dashboard() {
 
   const toggle = (id: string) => {
     setMsg("");
+    if (restriction?.blocked) { setMsg("Booking restricted until four ice days have finished."); setMsgType("error"); return; }
     setSelected((prev) => {
       if (prev.includes(id)) return prev.filter((x) => x !== id);
       if (!canSelectSession(sessions, prev, id, credits, nowMs, tempMember)) {
@@ -664,6 +672,7 @@ export default function Dashboard() {
   };
 
   const book = async () => {
+    if (restriction?.blocked) return;
     if (selected.length === 0) return;
 
     setBooking(true);
@@ -946,6 +955,7 @@ export default function Dashboard() {
             )}
 
             {viewMode !== "attendees" && <div style={{ padding: "14px 20px", background: CREAM, borderTop: `1px solid ${BORDER}` }}>
+              {restriction?.blocked && <Msg type="error" text={`Booking restricted after three marks. ${restriction.remaining_days} ice day(s) remaining.${restriction.ends_at ? ` Booking resumes ${new Date(restriction.ends_at).toLocaleString("en-US", { timeZone: "America/New_York" })} ET.` : " The end date will be available when more ice is scheduled."}`} />}
               {msg && <Msg text={msg} type={msgType} />}
               <button
                 className="btn-primary"
@@ -957,7 +967,7 @@ export default function Dashboard() {
                   justifyContent: "center",
                   gap: 8,
                 }}
-                disabled={selected.length === 0 || booking || (!tempMember && selectedCost > credits)}
+                disabled={restriction?.blocked || selected.length === 0 || booking || (!tempMember && selectedCost > credits)}
                 onClick={book}
               >
                 {booking ? "Booking…" : `Book Selected (${selected.length})`}

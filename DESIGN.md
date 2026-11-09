@@ -116,7 +116,7 @@ It:
 2. Rejects empty, duplicate, or null session IDs; charged bookings are bounded by the locked credit balance.
 3. Locks the member row to serialize credit spending.
 4. Locks each session row to serialize capacity checks.
-5. Enforces `release_at`, start time, capacity, and duplicate-booking rules.
+5. Enforces `release_at`, the exclusive end-time cutoff, booking restrictions, capacity, and duplicate-booking rules.
 6. Creates an approval request for a zero-credit temporary member.
 7. Allows a zero-credit booking in the 60-minute grace period.
 8. Records whether a credit was charged.
@@ -249,7 +249,7 @@ Native accordion headers share the admin date/time, notes label, and booking-cou
 
 The insert webhook uses the existing Vault secret and `notify-admins` worker. The worker reloads the notification by ID, sends only to its authoritative recipient with a per-notification Resend idempotency key, and records `sent_at` after success. Already-sent records are skipped. Delivery is asynchronous; failures remain pending and require operator review/retry, as with approval notifications. This event does not run for member self-cancellation.
 
-The dashboard uses a rules panel matching the Venmo pill’s red tint and border color with a bold, underlined heading. Both calendar and list views show the time until the later of release time and 60 minutes before start, then indicate the no-credit window (including a full-session state). Zero-capacity and started sessions have no no-credit indicator. These labels do not override RPC authorization or the temporary-account approval requirement.
+The dashboard uses a rules panel matching the Venmo pill’s red tint and border color with a bold, underlined heading. Both calendar and list views show the time until the later of release time and 60 minutes before start, then indicate the no-credit window (including a full-session state). Zero-capacity and ended sessions have no no-credit indicator; ongoing sessions retain it until their end. These labels do not override RPC authorization or the temporary-account approval requirement.
 
 ## Entire-session cancellation
 
@@ -274,3 +274,15 @@ Temporary members may select more sessions than their available credits. The exi
 ### Admin tier access
 
 The `enforce_admin_tier_access` database trigger and `users_admin_tier_access_check` constraint ensure every Admin-tier account has `is_admin = true`. The authorized user-management RPC derives effective access from the tier or explicit flag, including its self-demotion guard. Browser gates, RLS, notifications, and credit resets continue using the synchronized flag. The migration repairs existing Admin-tier mismatches without changing balances. Selecting Admin checks and disables the access checkbox; other tiers retain the explicit access control for existing administrators. Revocation requires a non-admin tier and a cleared access flag. Members cannot write tiers or access flags directly.
+
+## Attendance, infractions, and ongoing booking
+
+`bookings.present`, `attendance_marked_at`, and `attendance_marked_by` persist check-in status and the latest acting admin. `admin_set_attendance(uuid, boolean)` checks authorization, locks the active booking, and rejects future/cancelled sessions. Admin grouped rosters include `present`; marking absent does not create an infraction.
+
+`private.skating_infractions` stores the member, entered marking date, creating admin/time, and optional voiding admin/time. RLS is enabled and browser roles have no direct access. Checked RPCs provide bounded account search, atomic batches of 1–100 distinct accounts, date-specific history, and audited undo. Future dates are rejected. A partial unique index allows only one active mark per member/date, making repeated submissions harmless. The admin attests to skating without registration; marks are date-based rather than tied to a particular session block.
+
+`private.booking_restriction(uuid, timestamptz)` orders active marks within Jan–Jul and Aug–Dec semesters, starting a restriction at every third mark. It uses the entered date, not creation time; backdated entry and undo recalculate chronological thresholds. Each restriction starts at Eastern midnight on its threshold date and lasts through the end of the fourth distinct subsequent Eastern bookable date. Day end is the latest end time among positive-capacity, non-cancelled sessions on that date. Zero-capacity/show practice is excluded; full sessions still count. Multiple blocks count once. Schedule edits/cancellations update the calculation dynamically. If fewer than four dates exist, the restriction remains active with an unknown end until additional ice is scheduled. A restriction can continue across a semester boundary although mark counting restarts. Marks at 6, 9, etc. start another four-day restriction; overlapping restrictions must all expire.
+
+`my_booking_restriction()` exposes only the caller's status. Infraction writes lock user rows in UUID order, serializing against booking spending and approvals. `book_sessions` checks the restriction after locking the user. A booking insert/reactivation trigger also enforces it for admin approvals and restoration, preventing alternate write paths from bypassing it. Existing bookings, balances, cancellations, and refunds are unchanged. RPCs remain authorized independently of browser controls.
+
+Both member booking and temporary-member approval use the session end as the exclusive cutoff. Ongoing sessions remain subject to release, capacity, duplicate, and restriction checks. Ongoing member bookings are inside the existing no-credit window; zero-credit temporary members still require approval. No automatic emails are added for attendance or infractions.

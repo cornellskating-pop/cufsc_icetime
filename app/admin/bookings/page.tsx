@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../../lib/supabaseClient";
 import { SessionBookingHeader } from "../../../lib/sessionBookingHeader";
+import { InfractionPanel } from "../../../lib/infractionPanel";
 import { AdminTopBar, Msg } from "../../../lib/ui";
 
 type BookingEntry = {
@@ -13,6 +14,7 @@ type BookingEntry = {
   name: string;
   tier: string;
   status: string;
+  present: boolean;
 };
 
 type SessionGroup = {
@@ -38,6 +40,8 @@ type GroupedBookingRow = {
 };
 
 export default function AdminBookings() {
+  const [now, setNow] = useState(() => new Date());
+  const [attendanceSaving, setAttendanceSaving] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
   const [groups, setGroups] = useState<SessionGroup[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -82,6 +86,11 @@ export default function AdminBookings() {
     });
   }, []);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const removeBooking = async (entry: BookingEntry, group: SessionGroup) => {
     if (!window.confirm(`Remove ${entry.name || "this member"} from ${new Date(group.start_time).toLocaleString("en-US", { timeZone: "America/New_York" })} ET? Any charged credit will be refunded, and a removal email will be sent.`)) return;
     setRemoving(entry.booking_id);
@@ -98,6 +107,17 @@ export default function AdminBookings() {
     } finally { setRemoving(null); }
   };
 
+  const markAttendance = async (entry: BookingEntry) => {
+    setAttendanceSaving(entry.booking_id);
+    try {
+      const { error } = await supabase.rpc("admin_set_attendance", { p_booking_id: entry.booking_id, p_present: !entry.present });
+      if (error) throw error;
+      setGroups(current => current.map(group => ({ ...group, bookings: group.bookings.map(b => b.booking_id === entry.booking_id ? { ...b, present: !entry.present } : b) })));
+      setMsg("Attendance saved."); setMsgType("success");
+    } catch (e) { setMsg((e as { message?: string }).message || "Unable to save attendance. Please retry."); setMsgType("error"); }
+    finally { setAttendanceSaving(null); }
+  };
+
   const toggle = (id: string) =>
     setExpanded(prev => {
       const next = new Set(prev);
@@ -111,7 +131,6 @@ export default function AdminBookings() {
     hour: "numeric", minute: "2-digit",
   });
 
-  const now = new Date();
   const totalActive = groups.reduce((s, g) => s + g.bookings.length, 0);
 
   return (
@@ -126,6 +145,8 @@ export default function AdminBookings() {
         </div>
 
         {msg && <Msg text={msg} type={msgType} />}
+
+        <InfractionPanel />
 
         {groups.length === 0 ? (
           <div style={{ padding: "40px 0", textAlign: "center", color: "var(--muted)" }}>No sessions to show.</div>
@@ -151,7 +172,7 @@ export default function AdminBookings() {
                     g.bookings.length === 0 ? (
                       <div style={{ padding: "16px 20px", fontSize: 13, color: "var(--muted)" }}>No bookings for this session.</div>
                     ) : (
-                      <table className="data-table">
+                      <div style={{ overflowX: "auto" }}><table className="data-table">
                         <thead>
                           <tr>
                             <th>#</th>
@@ -159,6 +180,7 @@ export default function AdminBookings() {
                             <th>Email</th>
                             <th>Tier</th>
                             <th>Signed Up</th>
+                            <th>Present</th>
                             <th>Actions</th>
                           </tr>
                         </thead>
@@ -178,11 +200,12 @@ export default function AdminBookings() {
                                 </span>
                               </td>
                               <td style={{ color: "var(--muted)", fontSize: 12 }}>{fmtShort(b.created_at)}</td>
+                              <td><input type="checkbox" aria-label={`Present: ${b.name || b.email}`} checked={b.present ?? false} disabled={attendanceSaving !== null || new Date(g.start_time) > now} onChange={() => void markAttendance(b)} /></td>
                               <td>{!isPast && <button className="btn-danger" disabled={removing !== null} onClick={() => void removeBooking(b, g)}>{removing === b.booking_id ? "Removing…" : "Remove"}</button>}</td>
                             </tr>
                           ))}
                         </tbody>
-                      </table>
+                      </table></div>
                     )
                   )}
                 </div>

@@ -43,3 +43,5 @@ Do not rewrite historical migrations. Do not update or commit `supabase/schema.s
 Review the diff, confirm no secret or unrelated file is included, summarize behavior and verification, identify any required deployment, and commit or push only when the user explicitly asks.
 
 Admin-tier accounts must always have administrator access (`is_admin = true`), enforced in PostgreSQL. Preserve explicit admin access on other tiers and the self-demotion guard. Treat assigning the Admin tier as granting full administrator permissions.
+
+Attendance and infraction policy is enforced in PostgreSQL. Count active marks by entered Eastern date in Jan–Jul/Aug–Dec semesters; every third mark restricts new bookings through the next four distinct positive-capacity, non-cancelled ice dates. Keep audited undo and daily idempotency. Preserve existing bookings and credits, and enforce restrictions across member booking, approvals, and booking reactivation. Session end is the exclusive booking cutoff. Run `supabase/tests/attendance_smoke.sql` for changes in this area.

@@ -97,3 +97,9 @@ Selection counts credit-using sessions against the current balance, with no fixe
 Temporary members may select more sessions than their available credits. The existing booking RPC spends credits as it processes the batch and submits approval requests once they run out. The Venmo popup counts only new approval requests: one credit covering one of two paid sessions leaves a $15 payment, not $30. Free bookings and failed or already-pending requests do not add to the payment.
 
 Selecting the Admin tier automatically grants administrator access and eligibility for the two-credit weekly reset. Existing admin access on other tiers remains supported.
+
+## Attendance and skating infractions
+
+Admin Bookings includes Present checkboxes for active bookings once a session starts, plus a separate search-and-add panel for batch infractions. Choose the marking date (Eastern today by default), add skaters, and select **Submit Infractions**. One active mark per skater per date prevents duplicate submissions. **Undo mark** corrects mistakes while retaining an audit record.
+
+Every third mark in a semester (Jan–Jul or Aug–Dec, based on the entered date) restricts new bookings immediately from that marking date through the next four distinct Eastern dates with bookable ice. Multiple blocks count once; cancelled and zero-capacity show-practice sessions do not count. Breaks extend the restriction. Existing bookings and credits stay intact. Members can book ongoing sessions until, but not at, their end time; the existing no-credit window and temporary-member approval rules continue to apply.
