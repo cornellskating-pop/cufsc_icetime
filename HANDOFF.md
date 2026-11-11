@@ -285,3 +285,7 @@ Run both `supabase/tests/hardening_smoke.sql` and `supabase/tests/attendance_smo
 Every third mark within Jan–Jul or Aug–Dec starts a booking restriction from the entered date through four following distinct bookable ice dates. Existing bookings remain. Check the member restriction notice and attempts through both direct booking and approval. Test multiple blocks per day, breaks, cancelled/show-practice dates, semester rollover, and exact end-time boundaries. If fewer than four future ice dates are scheduled, the end is unknown; add the actual schedule rather than clearing legitimate marks to force expiration. Schedule edits and undo recalculate restrictions. Correct a mistaken mark with **Undo mark** for its entered date; this retains the audit record. Current balances and missed-credit adjustments are separate operations.
 
 Ongoing sessions accept bookings until their end, including the final 30 minutes. Regular members use the existing no-credit window; zero-credit temporary members still submit approval requests. Attendance and infraction actions do not send email.
+
+## Booking policy link
+
+The booking rules heading includes **Laws of Lynah ↗**, linking to the club’s 2026–27 Google Doc in a new tab. This is a frontend-only change. Verify the link destination and keyboard focus, and confirm the heading and link stay on one row on narrow screens; no database or Edge Function deployment is needed.

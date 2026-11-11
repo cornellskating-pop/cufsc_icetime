@@ -60,7 +60,7 @@ npx supabase stop
 
 Add `http://localhost:3000/auth/callback` to the Supabase Auth redirect allowlist before testing local Google login.
 
-Admins can remove individual bookings with credit refunds and email notifications. Admin Tools also includes an immediate one-credit contingency reset; temporary accounts receive zero, and the next weekly reset sets Basic members and all admins to 2 while preserving other balances. The dashboard highlights booking rules and shows the countdown to no-credit booking in calendar and list views.
+Admins can remove individual bookings with credit refunds and email notifications. Admin Tools also includes an immediate one-credit contingency reset; temporary accounts receive zero, and the next weekly reset sets Basic members and all admins to 2 while preserving other balances. The dashboard links to the Laws of Lynah document beside “Read before booking,” highlights booking rules, and shows the countdown to no-credit booking in calendar and list views.
 
 Temporary members who submit new session approval requests see a dismissible Venmo popup for $15 per newly requested session, with a prefilled payment link to @CUFSC. Payment does not automatically approve a booking.
 

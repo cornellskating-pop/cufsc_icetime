@@ -841,7 +841,18 @@ export default function Dashboard() {
           </div>
 
           <section className="booking-rules-panel" aria-labelledby="booking-rules-heading">
-          <h2 id="booking-rules-heading">Read before booking</h2>
+          <div className="booking-rules-heading-row">
+            <h2 id="booking-rules-heading">Read before booking</h2>
+            <a
+              className="booking-policy-link"
+              href="https://docs.google.com/document/d/17u_ei5RkrB1vULLFB3-U8lA64QG-lx-NbedqqBDhGD8/edit?usp=sharing"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Laws of Lynah - CUFSC 2026-27 (opens in a new tab)"
+            >
+              Laws of Lynah ↗
+            </a>
+          </div>
           <ul className="booking-rules">
             <li>One session per credit.</li>
             <li>Purchased credits on temporary member accounts carry over from week to week. Basic members and all admins reset to 2 credits each week.</li>
@@ -1142,7 +1153,10 @@ export default function Dashboard() {
           gap: 12px;
         }
         .booking-rules-panel { background: rgba(207, 47, 47, .06); border: 2px solid rgba(207, 47, 47, .22); border-left-width: 6px; border-radius: 12px; padding: 18px 20px; color: ${RED}; }
-        .booking-rules-panel h2 { margin: 0 0 12px; font-size: 18px; font-weight: 800; text-decoration: underline; text-underline-offset: 4px; }
+        .booking-rules-heading-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+        .booking-policy-link { flex-shrink: 0; font-size: 12px; font-weight: 600; color: inherit; text-underline-offset: 3px; white-space: nowrap; }
+        .booking-policy-link:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; border-radius: 2px; }
+        .booking-rules-panel h2 { margin: 0; font-size: 18px; font-weight: 800; text-decoration: underline; text-underline-offset: 4px; }
         .free-booking-indicator { display: block; margin-top: 4px; font-size: 11px; font-weight: 700; color: #17624A; }
         .calendar-session-block .free-booking-indicator { font-size: 8px; line-height: 1.25; white-space: normal; }
         .booking-rules {
@@ -1690,6 +1704,10 @@ export default function Dashboard() {
             grid-template-columns: 1fr !important;
             gap: 16px !important;
           }
+        }
+        @media (max-width: 480px) {
+          .booking-rules-panel h2 { font-size: 14px; }
+          .booking-policy-link { font-size: 11px; }
         }
         @media (max-width: 680px) {
           .dashboard-grid {
