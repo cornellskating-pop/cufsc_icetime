@@ -168,3 +168,5 @@ docker exec -i supabase_db_ice-booking \
 ```
 
 Test server cutoffs at 5/8 minutes and the exactly-35-minute duration, active/cancelled/present eligibility, past-session reporting, authorization, batch rollback and retries, shared daily uniqueness, semester penalties, and undo. No-show tests use synthetic accounts and send no messages.
+
+For penalty settings or user strike management, run `node --test tests/noShowRules.test.ts` and `supabase/tests/penalty_controls_smoke.sql` with the same local Docker/psql workflow. Test configured cutoff boundaries, same-snapshot context, authorized updates, stale-save rejection, history/removal authorization, audit retention, and restriction recalculation. For UI changes verify the native roster disclosure and profile strike modal, including keyboard controls and preserved selection.

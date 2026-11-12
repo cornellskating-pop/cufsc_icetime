@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "../../../lib/supabaseClient";
+import { UserStrikeDialog } from "../../../lib/userStrikeDialog";
 import { AdminTopBar, Avatar, Msg } from "../../../lib/ui";
 
 type Row = { id: string; email: string; name: string; tier: string; credits_balance: number; is_admin: boolean };
@@ -17,6 +18,7 @@ export default function AdminUsers() {
   const [msgType, setMsgType] = useState<"success"|"error"|"info">("info");
   const [search, setSearch] = useState("");
   const [tierFilter, setTierFilter] = useState("all");
+  const [strikeUser, setStrikeUser] = useState<Row | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
 
   const load = async () => {
@@ -183,6 +185,7 @@ export default function AdminUsers() {
                     <td>
                       <div style={{ display: "flex", gap: 8 }}>
                         <button className="btn-link" onClick={() => edit(r)}>Edit</button>
+                        <button className="btn-link" onClick={() => setStrikeUser(r)}>Strikes</button>
                         <button className="btn-link" style={{ color: "var(--red)" }} onClick={() => setDeleteTarget(r)}>Delete</button>
                       </div>
                     </td>
@@ -194,6 +197,8 @@ export default function AdminUsers() {
         </div>
       </div>
     </div>
+
+    {strikeUser && <UserStrikeDialog key={strikeUser.id} user={strikeUser} onClose={() => setStrikeUser(null)} />}
 
     {deleteTarget && (
       <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 100,

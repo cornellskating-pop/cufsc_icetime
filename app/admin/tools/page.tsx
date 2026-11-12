@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "../../../lib/supabaseClient";
+import { NoShowRuleSettings } from "../../../lib/noShowRuleSettings";
 import { AdminTopBar, Msg } from "../../../lib/ui";
 
 type ToolResult = { data: unknown; error: { message: string } | null };
@@ -74,6 +75,8 @@ export default function AdminTools() {
           <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 22, letterSpacing: "-0.02em" }}>Tools</div>
           <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Administrative operations — use with care</div>
         </div>
+
+        <NoShowRuleSettings />
 
         {msg && <Msg text={msg} type={msgType} />}
 

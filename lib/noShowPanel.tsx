@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
 import { easternToday } from "./infractionPanel";
+import { noShowRuleDescription, type NoShowRules } from "./noShowRules";
 import { Msg } from "./ui";
 
 type Session = { id: string; start_time: string; end_time: string; label: string | null; reportable_at: string };
@@ -12,6 +13,7 @@ const eligible = (s: Skater) => !s.present && !s.already_marked && s.booking_sta
 
 export function NoShowPanel() {
   const [date, setDate] = useState(easternToday);
+  const [rules, setRules] = useState<NoShowRules | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [sessionId, setSessionId] = useState("");
   const [roster, setRoster] = useState<Skater[]>([]);
@@ -35,10 +37,11 @@ export function NoShowPanel() {
   useEffect(() => {
     if (!date) return;
     let active = true;
-    void supabase.rpc("admin_no_show_sessions", { p_date: date }).then(({ data, error }) => {
+    void supabase.rpc("admin_no_show_context", { p_date: date }).then(({ data, error }) => {
       if (!active) return;
-      if (error) { setError(error.message); setSessions([]); setSessionId(""); setRoster([]); setSelected([]); setLoading(false); return; }
-      const rows = (data || []) as Session[];
+      if (error) { setError(error.message); setRules(null); setSessions([]); setSessionId(""); setRoster([]); setSelected([]); setLoading(false); return; }
+      setRules(data.rules as NoShowRules);
+      const rows = (data.sessions || []) as Session[];
       setSessions(rows);
       setSessionId(old => rows.some(s => s.id === old) ? old : (rows.find(s => Date.now() < new Date(s.end_time).getTime()) || rows.at(-1))?.id || "");
       if (!rows.length) { setRoster([]); setLoading(false); }
@@ -88,7 +91,8 @@ export function NoShowPanel() {
 
   return <section aria-labelledby="no-show-heading" style={{ padding: 20 }}>
     <h2 id="no-show-heading" style={{ fontSize: 18, margin: "0 0 8px" }}>Booked but absent</h2>
-    <p style={{ fontSize: 13, color: "var(--muted)" }}>Select a session and only the skaters whose absence you have confirmed. Reporting opens 5 minutes after start for sessions under 35 minutes, or 8 minutes after start for sessions of 35 minutes or more. Past sessions can also be reported.</p>
+    <p style={{ fontSize: 13, color: "var(--muted)" }}>Select a session and only the skaters whose absence you have confirmed. {rules ? noShowRuleDescription(rules) : "Loading saved timing rules…"} Past sessions can also be reported.</p>
+    <p style={{ fontSize: 12 }}><a href="/admin/tools#no-show-settings-heading">Change timing rules in Admin Tools ↗</a></p>
     <p style={{ fontSize: 12, color: "var(--muted)" }}>Unchecked Present boxes never create automatic strikes. Cancelled bookings are excluded. Strikes use the session’s Eastern date and count toward the existing semester penalty, with at most one strike per skater per date. Bookings and credits stay unchanged.</p>
     {error && <Msg type="error" text={error} />}
     {message && <Msg type="success" text={message} />}
@@ -105,7 +109,9 @@ export function NoShowPanel() {
       <button className="btn-ghost" disabled={busy || !date} onClick={() => { setLoading(true); setError(""); setRevision(r => r + 1); }}>Refresh</button>
     </div>
     {session && <p style={{ fontSize: 13 }}>{cutoffReached ? `Reporting is open (cutoff: ${time(session.reportable_at)} ET).` : `Reporting opens at ${time(session.reportable_at)} ET.`}</p>}
-    {rosterLoading ? <p aria-live="polite">Loading roster…</p> : session && !roster.length ? <p>No active bookings for this session.</p> : <ul style={{ listStyle: "none", padding: 0 }}>
+    <details key={sessionId} style={{ margin: "16px 0" }}>
+      <summary style={{ cursor: "pointer", fontWeight: 600, padding: "8px 0" }}>Session roster ({rosterLoading ? "loading…" : `${roster.length} skaters`}) · {selected.length} selected</summary>
+      {rosterLoading ? <p aria-live="polite">Loading roster…</p> : session && !roster.length ? <p>No active bookings for this session.</p> : <ul style={{ listStyle: "none", padding: 0 }}>
       {roster.map(s => <li key={s.booking_id} style={{ display: "flex", gap: 12, justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
         <label style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0 }}>
           <input type="checkbox" checked={selected.includes(s.booking_id)} disabled={busy || !cutoffReached || !eligible(s)} onChange={e => setSelected(old => e.target.checked ? [...old, s.booking_id] : old.filter(id => id !== s.booking_id))} />
@@ -114,6 +120,7 @@ export function NoShowPanel() {
         {s.no_show_mark_id && <button className="btn-link" disabled={busy} onClick={() => void undo(s)}>Undo strike</button>}
       </li>)}
     </ul>}
+    </details>
     <button className="btn-primary" disabled={busy || rosterLoading || !cutoffReached || !selected.length} onClick={() => void submit()}>{busy ? "Saving…" : `Submit No-show Strikes (${selected.length})`}</button>
   </section>;
 }
