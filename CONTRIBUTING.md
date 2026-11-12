@@ -158,3 +158,13 @@ docker exec -i supabase_db_ice-booking \
 ```
 
 Keep infraction fixtures synthetic and delivery disabled. Check member/admin/anonymous permissions, batch atomicity and retries, audited undo, semester thresholds, distinct ice-date counting, breaks/DST, and the exclusive end-time cutoff. Attendance alone never creates an infraction.
+
+For no-show reporting changes, also run:
+
+```bash
+docker exec -i supabase_db_ice-booking \
+  psql -v ON_ERROR_STOP=1 -U postgres -d postgres \
+  < supabase/tests/no_show_smoke.sql
+```
+
+Test server cutoffs at 5/8 minutes and the exactly-35-minute duration, active/cancelled/present eligibility, past-session reporting, authorization, batch rollback and retries, shared daily uniqueness, semester penalties, and undo. No-show tests use synthetic accounts and send no messages.

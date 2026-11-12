@@ -289,3 +289,9 @@ Ongoing sessions accept bookings until their end, including the final 30 minutes
 ## Booking policy link
 
 The booking rules heading includes **Laws of Lynah ↗**, linking to the club’s 2026–27 Google Doc in a new tab. This is a frontend-only change. Verify the link destination and keyboard focus, and confirm the heading and link stay on one row on narrow screens; no database or Edge Function deployment is needed.
+
+## No-show reporting rollout
+
+Apply `20261111120000_report_booked_no_shows.sql` before deploying the new infraction tabs, following the authorized migration-list/dry-run procedure. No Edge Function deployment is required. Migration alone creates no strikes and changes no existing booking or balance. Existing infraction rows retain the default unregistered-skating reason.
+
+Run `supabase/tests/no_show_smoke.sql` locally in addition to hardening and attendance smoke tests. Verify both sides of the 5-minute and 8-minute cutoffs, exactly 35-minute duration, ongoing/past date selection, cancelled/present exclusions, batch rollback, retries, same-day cross-type uniqueness, the shared third-strike restriction, and audited undo. Only confirmed admin selections may create no-show strikes; never enable automatic absence strikes from unchecked attendance. Use **Booked but absent → Undo strike** for mistakes; marking Present later or cancelling does not erase an already recorded strike. Existing date-specific mark history also supports undo.

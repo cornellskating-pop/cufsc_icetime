@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../../lib/supabaseClient";
 import { SessionBookingHeader } from "../../../lib/sessionBookingHeader";
-import { InfractionPanel } from "../../../lib/infractionPanel";
+import { InfractionTabs } from "../../../lib/infractionTabs";
 import { AdminTopBar, Msg } from "../../../lib/ui";
 
 type BookingEntry = {
@@ -146,7 +146,7 @@ export default function AdminBookings() {
 
         {msg && <Msg text={msg} type={msgType} />}
 
-        <InfractionPanel />
+        <InfractionTabs />
 
         {groups.length === 0 ? (
           <div style={{ padding: "40px 0", textAlign: "center", color: "var(--muted)" }}>No sessions to show.</div>

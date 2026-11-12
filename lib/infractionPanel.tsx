@@ -16,7 +16,7 @@ function restrictionLabel(r: Restriction) {
   return r.blocked ? `${r.marks} marks this semester · Booking restricted (${r.remaining_days} ice days left)` : `${r.marks} marks this semester`;
 }
 
-export function InfractionPanel() {
+export function InfractionPanel({ embedded = false }: { embedded?: boolean }) {
   const [date, setDate] = useState(easternToday);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Skater[]>([]);
@@ -75,7 +75,7 @@ export function InfractionPanel() {
     finally { setBusy(false); }
   };
 
-  return <section className="card" aria-labelledby="infractions-heading" style={{ padding: 20, marginBottom: 24 }}>
+  return <section className={embedded ? undefined : "card"} aria-labelledby="infractions-heading" style={{ padding: 20, marginBottom: embedded ? 0 : 24 }}>
     <h2 id="infractions-heading" style={{ fontSize: 18, margin: "0 0 8px" }}>Skating without signing up</h2>
     <p style={{ fontSize: 13, color: "var(--muted)" }}>Add skaters who skated without a booking, choose the date, then submit together. One mark per skater per date. Every third mark in a semester restricts new bookings through the next four ice dates.</p>
     <p style={{ fontSize: 12, color: "var(--muted)" }}>Semesters: Jan–Jul and Aug–Dec. Cancelled sessions and show practices do not count toward the four days. Existing bookings stay in place.</p>
