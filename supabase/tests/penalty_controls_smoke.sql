@@ -42,8 +42,8 @@ set local role authenticated;
 do $$ declare r jsonb; v_id uuid; begin
  r:=public.admin_user_infractions('30000000-0000-0000-0000-000000000002');
  v_id:=(r->'strikes'->0->>'id')::uuid;
- perform public.admin_void_infraction(v_id);
- perform public.admin_void_infraction(v_id);
+ perform public.admin_void_infraction(v_id, 'Synthetic test justification');
+ perform public.admin_void_infraction(v_id, 'Synthetic test justification');
  r:=public.admin_user_infractions('30000000-0000-0000-0000-000000000002');
  if jsonb_array_length(r->'strikes')<>2 or (r->'restriction'->>'blocked')::boolean then raise exception 'Undo did not recalculate'; end if;
 end; $$;

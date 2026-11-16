@@ -311,3 +311,13 @@ Read before booking displays the saved removal delay, states that lateness/absen
 ## Compact booking header
 
 The booking title and rules share one frame. On desktop, rule text wraps beside and underneath the title; below 900px they stack. Verify no overlap or horizontal overflow, all rules and the saved absence delay remain visible, and the Laws of Lynah link is accessible. This layout change requires only a frontend deployment.
+
+## Justified strike adjustment rollout
+
+Apply `20261116120000_justified_strike_adjustments.sql` before the matching frontend, using authorized migration-list/dry-run checks. It changes no existing balance, strike count, or restriction and sends no messages. No Edge Function update is needed. Legacy award/undo calls without written justification will reject until the frontend is refreshed.
+
+Admin Users → **Strikes** provides dated Add strike and per-record Remove strike forms requiring a 3–1000-character explanation. The date determines the semester and any restriction threshold; future dates and duplicate active dates are rejected. Admin Bookings awards and Undo mark also require notes. Removed entries remain under **Removed strikes** with both the original and correction reasons. Repeated requests do not duplicate grants/removals or overwrite the first correction.
+
+Supabase storage: `private.skating_infractions` is the authoritative strike ledger (`reason`, `marked_date`, `justification`, `created_by`, `created_at`, `void_justification`, `voided_by`, `voided_at`). `private.strike_adjustments` is the append-only application audit of new awards/removals and written explanations. Inspect these through trusted Supabase database administration; do not expose the private schema or paste member notes into logs. Existing records may have null notes because older versions did not collect them. Use the app's correction workflow rather than direct deletes.
+
+Run `supabase/tests/strike_adjustments_smoke.sql` alongside hardening, attendance, absence-removal, and penalty-controls suites. Verify blank/whitespace/overlong notes are rejected server-side, stale signatures cannot bypass notes, retries and daily uniqueness hold, all history and original/removal reasons remain, members cannot adjust/read another user’s strikes or private notes, and penalties recalculate correctly.

@@ -18,6 +18,7 @@ function restrictionLabel(r: Restriction) {
 
 export function InfractionPanel({ embedded = false }: { embedded?: boolean }) {
   const [date, setDate] = useState(easternToday);
+  const [justification, setJustification] = useState("");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Skater[]>([]);
   const [stack, setStack] = useState<Skater[]>([]);
@@ -53,22 +54,25 @@ export function InfractionPanel({ embedded = false }: { embedded?: boolean }) {
   }, [query, date, revision]);
 
   const submit = async () => {
-    if (!stack.length || !date || busy) return;
+    if (!stack.length || !date || busy || justification.trim().length < 3) return;
     setBusy(true); setError(""); setMessage("");
     try {
-      const { data, error } = await supabase.rpc("admin_submit_infractions", { p_user_ids: stack.map(s => s.id), p_date: date });
+      const { data, error } = await supabase.rpc("admin_submit_infractions", { p_user_ids: stack.map(s => s.id), p_date: date, p_justification: justification.trim() });
       if (error) throw error;
       setMessage(`${data.added} infraction${data.added === 1 ? "" : "s"} submitted. ${data.already_marked ? `${data.already_marked} already marked for this date.` : ""}`);
-      setStack([]); setRevision(r => r + 1);
+      setStack([]); setJustification(""); setRevision(r => r + 1);
     } catch (e) { setError(e instanceof Error ? e.message : (e as { message?: string }).message || "Unable to submit infractions. Try again."); }
     finally { setBusy(false); }
   };
 
   const undo = async (mark: Mark) => {
     if (!window.confirm(`Undo the ${mark.marked_date} infraction for ${mark.name || mark.email}? Their booking restriction will be recalculated.`)) return;
+    const note = window.prompt("Written justification for removing this strike (3–1000 characters):");
+    if (note === null) return;
+    if (note.trim().length < 3 || note.trim().length > 1000) { setError("Written justification must be 3–1000 characters."); return; }
     setBusy(true); setError(""); setMessage("");
     try {
-      const { error } = await supabase.rpc("admin_void_infraction", { p_id: mark.id });
+      const { error } = await supabase.rpc("admin_void_infraction", { p_id: mark.id, p_justification: note.trim() });
       if (error) throw error;
       setMessage("Infraction undone."); setRevision(r => r + 1);
     } catch (e) { setError((e as { message?: string }).message || "Unable to undo infraction."); }
@@ -98,7 +102,8 @@ export function InfractionPanel({ embedded = false }: { embedded?: boolean }) {
     <h3 style={{ fontSize: 14, marginTop: 20 }}>Selected skaters ({stack.length})</h3>
     {stack.length === 0 && <p style={{ fontSize: 13, color: "var(--muted)" }}>Add accounts from the search results.</p>}
     <ul style={{ paddingLeft: 20 }}>{stack.map(s => <li key={s.id} style={{ marginBottom: 8 }}>{s.name || s.email} <span style={{ fontSize: 12 }}>({s.email})</span> <button className="btn-link" disabled={busy} onClick={() => setStack(old => old.filter(x => x.id !== s.id))} aria-label={`Remove ${s.name || s.email} from selection`}>Remove</button></li>)}</ul>
-    <button className="btn-primary" disabled={busy || !stack.length || !date} onClick={() => void submit()}>{busy ? "Saving…" : "Submit Infractions"}</button>
+    <label style={{ display: "block", fontSize: 13, margin: "12px 0" }}>Written justification (required for each selected skater)<textarea className="input" rows={3} maxLength={1000} value={justification} disabled={busy} onChange={e => setJustification(e.target.value)} placeholder="Describe why these strikes are being granted. Submit separately if the reasons differ." style={{ marginTop: 4, resize: "vertical" }} /></label>
+    <button className="btn-primary" disabled={busy || !stack.length || !date || justification.trim().length < 3} onClick={() => void submit()}>{busy ? "Saving…" : "Submit Infractions"}</button>
     <h3 style={{ fontSize: 14, marginTop: 24 }}>Marks on {date || "selected date"}</h3>
     {marks.length === 0 && <p style={{ fontSize: 13, color: "var(--muted)" }}>No marks recorded.</p>}
     {marks.map(m => <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "8px 0" }}>

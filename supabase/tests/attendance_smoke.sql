@@ -18,7 +18,7 @@ do $$ declare r jsonb; begin
   if (r->0->>'ok')::boolean is not true then raise exception 'Ongoing session booking failed: %',r; end if;
   r := public.book_sessions(array['ATT-ENDED']);
   if (r->0->>'message') <> 'Session already ended' then raise exception 'Exact end must reject: %',r; end if;
-  begin perform public.admin_submit_infractions(array['10000000-0000-0000-0000-000000000002'::uuid],current_date); raise exception 'Member submitted infractions';
+  begin perform public.admin_submit_infractions(array['10000000-0000-0000-0000-000000000002'::uuid],current_date, 'Synthetic test justification'); raise exception 'Member submitted infractions';
   exception when others then if sqlerrm not like '%Not authorized%' then raise; end if; end;
   begin perform public.admin_search_skaters('Attendance',current_date); raise exception 'Member searched accounts';
   exception when others then if sqlerrm not like '%Not authorized%' then raise; end if; end;
@@ -54,7 +54,7 @@ do $$ begin
 end; $$;
 -- Batch creation, search, and date history are admin-only and coherent.
 set local role authenticated;
-select public.admin_submit_infractions(array['10000000-0000-0000-0000-000000000002'::uuid,'10000000-0000-0000-0000-000000000003'::uuid],date '2000-02-01');
+select public.admin_submit_infractions(array['10000000-0000-0000-0000-000000000002'::uuid,'10000000-0000-0000-0000-000000000003'::uuid],date '2000-02-01', 'Synthetic test justification');
 do $$ begin
   if (select count(*) from public.admin_list_infractions(date '2000-02-01')) <> 2 then raise exception 'Batch history missing skaters'; end if;
   if (select count(*) from public.admin_search_skaters('Attendance',date '2000-02-01') where marked_on_date and marks=1) <> 2 then raise exception 'Search missing dated mark counts'; end if;
@@ -87,13 +87,13 @@ end; $$;
 
 -- Actual submissions are atomic/idempotent and a third mark blocks all new
 -- booking paths while keeping existing attendance/bookings/credits intact.
-select public.admin_submit_infractions(array['10000000-0000-0000-0000-000000000002'::uuid],(now() at time zone 'America/New_York')::date-2);
-select public.admin_submit_infractions(array['10000000-0000-0000-0000-000000000002'::uuid],(now() at time zone 'America/New_York')::date-1);
-select public.admin_submit_infractions(array['10000000-0000-0000-0000-000000000002'::uuid],(now() at time zone 'America/New_York')::date);
+select public.admin_submit_infractions(array['10000000-0000-0000-0000-000000000002'::uuid],(now() at time zone 'America/New_York')::date-2, 'Synthetic test justification');
+select public.admin_submit_infractions(array['10000000-0000-0000-0000-000000000002'::uuid],(now() at time zone 'America/New_York')::date-1, 'Synthetic test justification');
+select public.admin_submit_infractions(array['10000000-0000-0000-0000-000000000002'::uuid],(now() at time zone 'America/New_York')::date, 'Synthetic test justification');
 do $$ declare r jsonb; begin
-  r := public.admin_submit_infractions(array['10000000-0000-0000-0000-000000000002'::uuid],(now() at time zone 'America/New_York')::date);
+  r := public.admin_submit_infractions(array['10000000-0000-0000-0000-000000000002'::uuid],(now() at time zone 'America/New_York')::date, 'Synthetic test justification');
   if (r->>'added')::integer <> 0 then raise exception 'Retry duplicated a mark'; end if;
-  begin perform public.admin_submit_infractions(array['10000000-0000-0000-0000-000000000002'::uuid,'10000000-0000-0000-0000-999999999999'::uuid],(now() at time zone 'America/New_York')::date-3); raise exception 'Invalid batch succeeded';
+  begin perform public.admin_submit_infractions(array['10000000-0000-0000-0000-000000000002'::uuid,'10000000-0000-0000-0000-999999999999'::uuid],(now() at time zone 'America/New_York')::date-3, 'Synthetic test justification'); raise exception 'Invalid batch succeeded';
   exception when others then if sqlerrm not like '%Skater account not found%' then raise; end if; end;
   if exists(select 1 from private.skating_infractions where marked_date=(now() at time zone 'America/New_York')::date-3) then raise exception 'Batch was not atomic'; end if;
 end; $$;
@@ -116,11 +116,11 @@ set local role authenticated;
 do $$ begin
   begin perform public.admin_approve_request('ATT-BLOCKED-REQUEST'); raise exception 'Approval bypassed restriction';
   exception when others then if sqlerrm not like '%Booking restricted%' then raise; end if; end;
-  begin perform public.admin_submit_infractions(array['10000000-0000-0000-0000-000000000002'::uuid],(now() at time zone 'America/New_York')::date+1); raise exception 'Future infraction accepted';
+  begin perform public.admin_submit_infractions(array['10000000-0000-0000-0000-000000000002'::uuid],(now() at time zone 'America/New_York')::date+1, 'Synthetic test justification'); raise exception 'Future infraction accepted';
   exception when others then if sqlerrm not like '%not in the future%' then raise; end if; end;
 end; $$;
 reset role;
-select public.admin_void_infraction((select id from private.skating_infractions where user_id='10000000-0000-0000-0000-000000000002' and marked_date=(now() at time zone 'America/New_York')::date));
+select public.admin_void_infraction((select id from private.skating_infractions where user_id='10000000-0000-0000-0000-000000000002' and marked_date=(now() at time zone 'America/New_York')::date), 'Synthetic test justification');
 do $$ begin
   if (private.booking_restriction('10000000-0000-0000-0000-000000000002')->>'blocked')::boolean then raise exception 'Undo did not recalculate'; end if;
 end; $$;

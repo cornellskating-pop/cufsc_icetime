@@ -28,7 +28,7 @@ export function MemberStrikes() {
     {error ? <p>Strike history could not be loaded. Please reload the page.</p> : !history ? <p>Loading strikes…</p> : <>
       <p>{history.restriction.marks} strike(s) this semester · {history.restriction.blocked ? `${history.restriction.remaining_days} session day(s) remaining in your restriction` : "No active booking restriction"}</p>
       <details><summary>View active strikes ({history.strikes.length})</summary>
-        {history.strikes.length ? <ul style={{ paddingLeft: 18 }}>{history.strikes.map(s => <li key={s.id}>{s.marked_date}: {s.reason === "no_show" ? "Historical absence strike" : "Skating without signing up"}</li>)}</ul> : <p>No active strikes.</p>}
+        {history.strikes.length ? <ul style={{ paddingLeft: 18 }}>{history.strikes.map(s => <li key={s.id}>{s.marked_date}: {s.reason === "manual" ? "Manual strike" : s.reason === "no_show" ? "Historical absence strike" : "Skating without signing up"}</li>)}</ul> : <p>No active strikes.</p>}
       </details>
     </>}
   </section>;
