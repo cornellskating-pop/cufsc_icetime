@@ -830,17 +830,14 @@ export default function Dashboard() {
 
       <div className="dashboard-hero-shell" style={{ padding: "30px 28px 0" }}>
         <div
-          className="dashboard-hero"
+          className="dashboard-hero booking-rules-panel"
           style={{
             maxWidth: 1100,
             margin: "0 auto",
-            display: "grid",
-            gridTemplateColumns: "450px minmax(0, 1fr)",
-            gap: 40,
-            alignItems: "start",
+            display: "flow-root",
           }}
         >
-          <div>
+          <div className="dashboard-hero-intro">
             <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: MUTED, marginBottom: 10 }}>
               Cornell University Figure Skating Club
             </div>
@@ -848,11 +845,11 @@ export default function Dashboard() {
               Book your ice time <span style={{ color: RED }}>here.</span>
             </div>
             <div className="venmo-credit-info">
-              Venmo: @CUFSC <span>· $15/credit · Include your Cornell email</span>
+              <span className="venmo-recipient">Venmo: @CUFSC</span> <span>· $15/credit · Include your Cornell email</span>
             </div>
           </div>
 
-          <section className="booking-rules-panel" aria-labelledby="booking-rules-heading">
+          <section aria-labelledby="booking-rules-heading">
           <div className="booking-rules-heading-row">
             <h2 id="booking-rules-heading">Read before booking</h2>
             <a
@@ -865,7 +862,7 @@ export default function Dashboard() {
               Laws of Lynah ↗
             </a>
           </div>
-          <ul className="booking-rules">
+          <ul className="booking-rules" role="list">
             <li>One session per credit.</li>
             <li>Purchased credits on temporary member accounts carry over from week to week. Basic members and all admins reset to 2 credits each week.</li>
             <li>Select as many credit-using sessions as your available credits cover. No-credit bookings do not count toward this limit.</li>
@@ -1169,6 +1166,7 @@ export default function Dashboard() {
           gap: 12px;
         }
         .booking-rules-panel { background: rgba(207, 47, 47, .06); border: 2px solid rgba(207, 47, 47, .22); border-left-width: 6px; border-radius: 12px; padding: 18px 20px; color: ${RED}; }
+        .dashboard-hero-intro { float: left; width: 44%; margin: 0 28px 12px 0; }
         .booking-rules-heading-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
         .booking-policy-link { flex-shrink: 0; font-size: 12px; font-weight: 600; color: inherit; text-underline-offset: 3px; white-space: nowrap; }
         .booking-policy-link:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; border-radius: 2px; }
@@ -1179,18 +1177,18 @@ export default function Dashboard() {
           min-width: 0;
           margin: 0;
           padding-left: 18px;
-          display: flex;
-          flex-direction: column;
-          gap: 6px;
+          display: block;
+          list-style: none;
           color: ${INK};
           font-size: 13px;
           line-height: 1.5;
         }
-        .booking-rules li::marker {
-          color: ${RED};
-        }
+        .booking-rules li { display: flow-root; margin-bottom: 6px; }
+        .booking-rules li:last-child { margin-bottom: 0; }
+        .booking-rules li::before { content: "•"; color: ${RED}; margin-left: -14px; margin-right: 8px; }
+
         .dashboard-title {
-          white-space: nowrap;
+          white-space: normal;
         }
         .venmo-credit-info {
           width: fit-content;
@@ -1211,6 +1209,7 @@ export default function Dashboard() {
           color: ${INK};
           font-weight: 600;
         }
+        .venmo-credit-info .venmo-recipient { flex-shrink: 0; white-space: nowrap; color: ${RED}; font-weight: 700; }
         .session-view-toggle {
           display: flex;
           padding: 3px;
@@ -1716,10 +1715,7 @@ export default function Dashboard() {
           .show-session { animation: none !important; }
         }
         @media (max-width: 900px) {
-          .dashboard-hero {
-            grid-template-columns: 1fr !important;
-            gap: 16px !important;
-          }
+          .dashboard-hero-intro { float: none; width: auto; margin: 0 0 16px; }
         }
         @media (max-width: 480px) {
           .booking-rules-panel h2 { font-size: 14px; }

@@ -307,3 +307,7 @@ Admins select confirmed absent skaters after the cutoff and before session end. 
 Removal refunds charged credits and queues the existing member email. Free bookings produce no credit. Email delivery remains asynchronous and uses the existing notification worker and idempotency key. No new worker deployment is required. Historical strikes and cutoff snapshots are retained; administrators can correct historical strikes through Admin Users → Strikes using audited removal.
 
 Read before booking displays the saved removal delay, states that lateness/absence does not issue strikes, warns that skating without registration issues a strike, and explains that every third strike in a Jan–Jul/Aug–Dec semester prevents attendance for the next four distinct bookable session dates. New bookings are blocked; existing bookings/credits are not automatically removed by a restriction. Members are instructed not to attend during a restriction. The profile shows the member’s own semester count, restriction, and active strike dates via `my_infractions()` (no user-ID parameter and no access to other members). Profile and policy data refresh every 30 seconds.
+
+## Compact booking header
+
+The booking title and rules share one frame. On desktop, rule text wraps beside and underneath the title; below 900px they stack. Verify no overlap or horizontal overflow, all rules and the saved absence delay remain visible, and the Laws of Lynah link is accessible. This layout change requires only a frontend deployment.
