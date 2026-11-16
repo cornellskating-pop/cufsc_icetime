@@ -6,6 +6,7 @@ import { canSelectSession, selectionCost } from "../../lib/bookingSelection";
 import { formatCountdownAmount, freeBookingIndicator } from "../../lib/bookingTime";
 import { walkOnPayment } from "../../lib/walkOnPayment";
 import { WalkOnPaymentDialog } from "../../lib/walkOnPaymentDialog";
+import { MemberStrikes } from "../../lib/memberStrikes";
 import { SessionAttendees } from "../../lib/sessionAttendees";
 import { Loading, LogoMark, Msg, SpotBar } from "../../lib/ui";
 
@@ -564,18 +565,21 @@ export default function Dashboard() {
   const [viewMode, setViewMode] = useState<"calendar" | "list" | "attendees">("calendar");
   const preferenceQueue = useRef<Promise<unknown>>(Promise.resolve());
   const [restriction, setRestriction] = useState<{ blocked: boolean; marks: number; ends_at: string | null; remaining_days: number } | null>(null);
+  const [absenceDelay, setAbsenceDelay] = useState<number | null>(null);
   const [preferenceError, setPreferenceError] = useState("");
   const [calendarMonth, setCalendarMonth] = useState<CalendarMonth>(getCurrentETMonth);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   const refreshData = async (userId: string, restoreView = false) => {
-    const [{ data: sData }, { data: bData }, { data: uData }, restrictionResult] = await Promise.all([
+    const [{ data: sData }, { data: bData }, { data: uData }, restrictionResult, policyResult] = await Promise.all([
       supabase.from("sessions_with_spots").select("*").order("start_time", { ascending: true }),
       supabase.from("my_bookings").select("*").eq("status", "active").gte("start_time", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()).order("start_time", { ascending: false }),
       supabase.from("users").select("email, name, tier, credits_balance, is_admin, booking_view").eq("id", userId).maybeSingle(),
       supabase.rpc("my_booking_restriction"),
+      supabase.rpc("get_booking_policy"),
     ]);
 
+    setAbsenceDelay(policyResult.error ? null : policyResult.data.delay_minutes);
     if (!restrictionResult.error) setRestriction(restrictionResult.data);
     setSessions((sData || []) as Session[]);
     setMyBookings((bData || []) as MyBooking[]);
@@ -608,6 +612,14 @@ export default function Dashboard() {
     });
     return () => { active = false; };
   }, [nowMs, restriction?.blocked]);
+
+  useEffect(() => {
+    let active = true;
+    void supabase.rpc("get_booking_policy").then(({ data, error }) => {
+      if (active) setAbsenceDelay(error ? null : data.delay_minutes);
+    });
+    return () => { active = false; };
+  }, [nowMs]);
 
   const [accessStatus, setAccessStatus] = useState<"idle"|"pending"|"requested"|"error">("idle");
   const [accessError, setAccessError] = useState("");
@@ -862,7 +874,10 @@ export default function Dashboard() {
               During the final 60 minutes before start, a released session with space can be booked
               without using a credit. Temporary accounts without credits require approval.
             </li>
-            <li>Booking closes at the session start; cancellation closes 30 minutes after start.</li>
+            <li>Booking closes at the session end; cancellation closes 30 minutes after start.</li>
+            <li>{absenceDelay === null ? "Admins may remove late skaters after the configured delay. Timing is currently unavailable; please reload." : `If you are ${absenceDelay} minutes late, we reserve the right to remove you from the session.`} Being late or absent does not result in a strike. If removed, you will receive an email.</li>
+            <li>If you get on a session you are not registered for, you will receive a strike.</li>
+            <li>Every three strikes in a semester means you cannot attend the next four session days. Multiple sessions on the same date count as one day; cancelled dates and show practices do not count. New bookings are blocked during the restriction. Existing bookings are not automatically cancelled; do not attend while restricted.</li>
           </ul>
           </section>
         </div>
@@ -1066,6 +1081,7 @@ export default function Dashboard() {
               <span>Credits remaining</span>
               <strong style={{ color: INK }}>{credits}</strong>
             </div>
+            <MemberStrikes />
             {profile?.tier?.toLowerCase() === "temp" && !profile?.is_admin && (
               <p style={{ fontSize: 12, color: MUTED, lineHeight: 1.5, margin: "0 0 10px" }}>
                 Your purchased credits carry over from week to week. Weekly resets do not remove your unused credits.

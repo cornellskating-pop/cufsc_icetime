@@ -40,6 +40,7 @@ type GroupedBookingRow = {
 };
 
 export default function AdminBookings() {
+  const [revision, setRevision] = useState(0);
   const [now, setNow] = useState(() => new Date());
   const [attendanceSaving, setAttendanceSaving] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -84,7 +85,7 @@ export default function AdminBookings() {
       })));
       setExpanded(new Set(upcoming.map(s => s.id)));
     });
-  }, []);
+  }, [revision]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 30_000);
@@ -146,7 +147,7 @@ export default function AdminBookings() {
 
         {msg && <Msg text={msg} type={msgType} />}
 
-        <InfractionTabs />
+        <InfractionTabs onRemoved={() => setRevision(r => r + 1)} />
 
         {groups.length === 0 ? (
           <div style={{ padding: "40px 0", textAlign: "center", color: "var(--muted)" }}>No sessions to show.</div>

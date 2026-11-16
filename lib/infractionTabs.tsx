@@ -4,10 +4,10 @@ import { useState } from "react";
 import { InfractionPanel } from "./infractionPanel";
 import { NoShowPanel } from "./noShowPanel";
 
-export function InfractionTabs() {
+export function InfractionTabs({ onRemoved }: { onRemoved?: () => void }) {
   const [tab, setTab] = useState("unregistered");
   return <div className="card" style={{ marginBottom: 24 }}>
-    <div role="tablist" aria-label="Report skating infractions" style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "12px 20px", borderBottom: "1px solid var(--border)" }}>
+    <div role="tablist" aria-label="Skating infractions and absence removals" style={{ display: "flex", flexWrap: "wrap", gap: 8, padding: "12px 20px", borderBottom: "1px solid var(--border)" }}>
       {[["unregistered", "Skating without signing up"], ["no-show", "Booked but absent"]].map(([id, label]) => <button
         key={id} id={`infraction-tab-${id}`} role="tab" type="button" aria-selected={tab === id} aria-controls={`infraction-panel-${id}`} tabIndex={tab === id ? 0 : -1}
         className={tab === id ? "btn-primary" : "btn-ghost"}
@@ -24,7 +24,7 @@ export function InfractionTabs() {
       {tab === "unregistered" && <InfractionPanel embedded />}
     </div>
     <div id="infraction-panel-no-show" role="tabpanel" aria-labelledby="infraction-tab-no-show" hidden={tab !== "no-show"}>
-      {tab === "no-show" && <NoShowPanel />}
+      {tab === "no-show" && <NoShowPanel onRemoved={onRemoved} />}
     </div>
   </div>;
 }
