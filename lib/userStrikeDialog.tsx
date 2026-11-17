@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "./supabaseClient";
 import { easternToday } from "./infractionPanel";
 import { Msg } from "./ui";
+import { strikeCategory, strikeReason } from "./strikeReason";
 
 type Strike = { id: string; marked_date: string; reason: "unregistered" | "no_show" | "manual"; session_start: string | null; created_at: string; justification: string | null; created_by_name: string | null; voided_at: string | null; voided_by_name: string | null; void_justification: string | null };
 type History = { strikes: Strike[]; history: Strike[]; restriction: { blocked: boolean; marks: number; remaining_days: number } };
-const category = (s: Strike) => s.reason === "manual" ? "Manual strike" : s.reason === "no_show" ? "Historical absence strike" : "Skating without signing up";
 const validNote = (s: string) => s.trim().length >= 3 && s.trim().length <= 1000;
 
 export function UserStrikeDialog({ user, onClose }: { user: { id: string; name: string; email: string }; onClose: () => void }) {
@@ -74,8 +74,9 @@ export function UserStrikeDialog({ user, onClose }: { user: { id: string; name: 
   };
 
   const record = (s: Strike) => <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
-    <strong>{s.marked_date} · {category(s)}</strong>
-    <p style={{ margin: "4px 0", whiteSpace: "pre-wrap" }}>{s.justification || "No written justification recorded (legacy strike)."}</p>
+    <strong>{s.marked_date}</strong>
+    <div style={{ fontSize: 12, color: "var(--muted)" }}>Category: {strikeCategory(s.reason)}</div>
+    <p style={{ margin: "4px 0", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{strikeReason(s)}</p>
     <div style={{ fontSize: 12, color: "var(--muted)" }}>Granted by {s.created_by_name || "an admin (name unavailable)"} · {new Date(s.created_at).toLocaleString("en-US", { timeZone: "America/New_York" })} ET</div>
     {s.voided_at && <div style={{ marginTop: 6, fontSize: 12, whiteSpace: "pre-wrap" }}>Removed by {s.voided_by_name || "an admin (name unavailable)"} · {new Date(s.voided_at).toLocaleString("en-US", { timeZone: "America/New_York" })} ET<br />Removal reason: {s.void_justification || "No written justification recorded (legacy removal)."}</div>}
   </div>;
@@ -91,7 +92,7 @@ export function UserStrikeDialog({ user, onClose }: { user: { id: string; name: 
     <fieldset disabled={busy || !history} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 14, margin: "12px 0" }}>
       <legend>Add one strike</legend>
       <label style={{ display: "block", fontSize: 13 }}>Strike date (Eastern)<input className="input" type="date" max={easternToday()} value={date} onChange={e => setDate(e.target.value)} style={{ marginTop: 4, maxWidth: 220, display: "block" }} /></label>
-      <label style={{ display: "block", margin: "10px 0", fontSize: 13 }}>Why is this strike being granted?<textarea className="input" value={addNote} maxLength={1000} rows={3} onChange={e => setAddNote(e.target.value)} placeholder="Briefly describe the reason for this strike." style={{ marginTop: 4, resize: "vertical" }} /></label>
+      <label style={{ display: "block", margin: "10px 0", fontSize: 13 }}>Why is this strike being granted?<textarea className="input" value={addNote} maxLength={1000} rows={3} onChange={e => setAddNote(e.target.value)} placeholder="Describe the reason for this strike. This reason is visible to the skater." style={{ marginTop: 4, resize: "vertical" }} /></label>
       <button className="btn-primary" disabled={!date || !validNote(addNote)} onClick={() => void add()}>Add strike</button>
     </fieldset>
     {!history ? <p>{error ? "Strike history unavailable." : "Loading strikes…"}</p> : <>

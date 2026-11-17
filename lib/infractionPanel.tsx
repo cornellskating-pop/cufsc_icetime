@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "./supabaseClient";
+import { strikeReason } from "./strikeReason";
 import { Msg } from "./ui";
 
 type Restriction = { blocked: boolean; marks: number; ends_at: string | null; remaining_days: number };
 type Skater = { id: string; name: string | null; email: string; marks: number; marked_on_date: boolean; restriction: Restriction };
-type Mark = { id: string; user_id: string; name: string | null; email: string; marked_date: string; restriction: Restriction };
+type Mark = { id: string; user_id: string; name: string | null; email: string; marked_date: string; reason: string; justification: string | null; restriction: Restriction };
 
 export function easternToday() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -102,12 +103,12 @@ export function InfractionPanel({ embedded = false }: { embedded?: boolean }) {
     <h3 style={{ fontSize: 14, marginTop: 20 }}>Selected skaters ({stack.length})</h3>
     {stack.length === 0 && <p style={{ fontSize: 13, color: "var(--muted)" }}>Add accounts from the search results.</p>}
     <ul style={{ paddingLeft: 20 }}>{stack.map(s => <li key={s.id} style={{ marginBottom: 8 }}>{s.name || s.email} <span style={{ fontSize: 12 }}>({s.email})</span> <button className="btn-link" disabled={busy} onClick={() => setStack(old => old.filter(x => x.id !== s.id))} aria-label={`Remove ${s.name || s.email} from selection`}>Remove</button></li>)}</ul>
-    <label style={{ display: "block", fontSize: 13, margin: "12px 0" }}>Written justification (required for each selected skater)<textarea className="input" rows={3} maxLength={1000} value={justification} disabled={busy} onChange={e => setJustification(e.target.value)} placeholder="Describe why these strikes are being granted. Submit separately if the reasons differ." style={{ marginTop: 4, resize: "vertical" }} /></label>
+    <label style={{ display: "block", fontSize: 13, margin: "12px 0" }}>Written justification (required; visible to each selected skater)<textarea className="input" rows={3} maxLength={1000} value={justification} disabled={busy} onChange={e => setJustification(e.target.value)} placeholder="Describe why these strikes are being granted. Submit separately if the reasons differ." style={{ marginTop: 4, resize: "vertical" }} /></label>
     <button className="btn-primary" disabled={busy || !stack.length || !date || justification.trim().length < 3} onClick={() => void submit()}>{busy ? "Saving…" : "Submit Infractions"}</button>
     <h3 style={{ fontSize: 14, marginTop: 24 }}>Marks on {date || "selected date"}</h3>
     {marks.length === 0 && <p style={{ fontSize: 13, color: "var(--muted)" }}>No marks recorded.</p>}
     {marks.map(m => <div key={m.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "8px 0" }}>
-      <div><strong>{m.name || m.email}</strong><div style={{ fontSize: 12 }}>{restrictionLabel(m.restriction)}</div></div>
+      <div><strong>{m.name || m.email}</strong><p style={{ margin: "4px 0", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{strikeReason(m)}</p><div style={{ fontSize: 12 }}>{restrictionLabel(m.restriction)}</div></div>
       <button className="btn-link" disabled={busy} onClick={() => void undo(m)}>Undo mark</button>
     </div>)}
   </section>;

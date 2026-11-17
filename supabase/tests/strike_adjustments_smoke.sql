@@ -39,6 +39,7 @@ do $$ declare v_id uuid; v_request uuid := gen_random_uuid(); v_day date := (now
  r := public.admin_user_infractions('40000000-0000-0000-0000-000000000002');
  if (r->'restriction'->>'blocked')::boolean or jsonb_array_length(r->'strikes')<>2 or jsonb_array_length(r->'history')<>3 then raise exception 'Removal did not preserve history/recalculate'; end if;
  if not exists(select 1 from jsonb_array_elements(r->'history') s where s->>'id'=v_id::text and s->>'void_justification'='Synthetic correction after review' and s->>'justification'='Synthetic misconduct explanation' and s->>'voided_by_name'='Strike Admin') then raise exception 'Original/removal notes not retained'; end if;
+ if not exists(select 1 from public.admin_list_infractions(v_day-1) where user_id='40000000-0000-0000-0000-000000000002' and justification='Second synthetic incident' and reason='manual') then raise exception 'Dated admin explanation missing'; end if;
  -- Batch awards also require a written reason and skip daily duplicates.
  r := public.admin_submit_infractions(array['40000000-0000-0000-0000-000000000003'::uuid],v_day,'Synthetic skating without signup observation');
  if (r->>'added')::int<>1 then raise exception 'Justified batch failed'; end if;
@@ -58,7 +59,9 @@ set local role authenticated;
 do $$ declare r jsonb; begin
  r := public.my_infractions();
  if jsonb_array_length(r->'strikes')<>1 then raise exception 'Own-profile privacy changed'; end if;
- if (r->'strikes'->0) ? 'justification' then raise exception 'Private admin notes exposed to member'; end if;
+ if r->'strikes'->0->>'justification' is distinct from 'Synthetic skating without signup observation' then raise exception 'Own recorded explanation missing'; end if;
+ if (r->'strikes'->0) - array['id','marked_date','reason','justification'] <> '{}'::jsonb then raise exception 'Private correction/audit metadata exposed'; end if;
+ begin perform public.admin_list_infractions((now() at time zone 'America/New_York')::date); raise exception 'Member read dated admin notes'; exception when others then if sqlerrm not like '%Not authorized%' then raise; end if; end;
 end; $$;
 reset role;
 rollback;
